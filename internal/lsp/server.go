@@ -64,11 +64,15 @@ func New(version string, registry *render.Registry) *Server {
 		TextDocumentDidChange: s.didChange,
 		TextDocumentDidClose:  s.didClose,
 
-		TextDocumentHover:      s.hover,
-		TextDocumentCompletion: s.completion,
+		TextDocumentHover:          s.hover,
+		TextDocumentCompletion:     s.completion,
+		TextDocumentFoldingRange:   s.foldingRange,
+		TextDocumentDocumentLink:   s.documentLink,
+		TextDocumentDocumentSymbol: s.documentSymbol,
 
-		WorkspaceDidChangeConfiguration: s.didChangeConfig,
-		WorkspaceExecuteCommand:         s.executeCommand,
+		WorkspaceDidChangeConfiguration:    s.didChangeConfig,
+		WorkspaceDidChangeWorkspaceFolders: s.didChangeWorkspaceFolders,
+		WorkspaceExecuteCommand:            s.executeCommand,
 	}
 	return s
 }
@@ -86,16 +90,17 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 		Commands: []string{CommandShowRendered},
 	}
 
+	root := pickWorkspaceRoot(params)
 	var (
 		settings config.Settings
 		err      error
 	)
-	if params.RootURI != nil && *params.RootURI != "" {
-		s.workspaceRoot = *params.RootURI
-		settings, err = config.LoadFromWorkspace(*params.RootURI)
+	if root != "" {
+		s.workspaceRoot = root
+		settings, err = config.LoadFromWorkspace(root)
 		if err != nil {
 			notifyShowMessage(ctx, protocol.MessageTypeWarning,
-				"yamlls: failed to load .yamlls.yaml — "+err.Error())
+				"yamlls: failed to load .yamlls.yaml: "+err.Error())
 		}
 	}
 	if init := settingsFromInitOptions(params.InitializationOptions); init != nil {
@@ -110,6 +115,18 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 			Version: &s.version,
 		},
 	}, nil
+}
+
+// pickWorkspaceRoot returns the first WorkspaceFolder URI when set, else
+// falls back to deprecated rootUri.
+func pickWorkspaceRoot(params *protocol.InitializeParams) string {
+	if len(params.WorkspaceFolders) > 0 {
+		return params.WorkspaceFolders[0].URI
+	}
+	if params.RootURI != nil {
+		return *params.RootURI
+	}
+	return ""
 }
 
 func settingsFromInitOptions(opts any) *config.Settings {

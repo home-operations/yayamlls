@@ -5,10 +5,14 @@ import (
 	"net/url"
 
 	"github.com/home-operations/yamlls/internal/completion"
+	"github.com/home-operations/yamlls/internal/config"
 	"github.com/home-operations/yamlls/internal/diagnostics"
 	"github.com/home-operations/yamlls/internal/document"
+	"github.com/home-operations/yamlls/internal/folding"
 	"github.com/home-operations/yamlls/internal/hover"
+	"github.com/home-operations/yamlls/internal/links"
 	"github.com/home-operations/yamlls/internal/render"
+	"github.com/home-operations/yamlls/internal/symbols"
 	"github.com/home-operations/yamlls/internal/yamlast"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/tliron/glsp"
@@ -94,6 +98,30 @@ func (s *Server) completion(ctx *glsp.Context, params *protocol.CompletionParams
 	return list, nil
 }
 
+func (s *Server) foldingRange(ctx *glsp.Context, params *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
+	d, ok := s.docs.Get(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+	return folding.Ranges(d.Text), nil
+}
+
+func (s *Server) documentLink(ctx *glsp.Context, params *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
+	d, ok := s.docs.Get(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+	return links.Links(d.Text), nil
+}
+
+func (s *Server) documentSymbol(ctx *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
+	d, ok := s.docs.Get(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+	return symbols.Outline(d.Text), nil
+}
+
 func (s *Server) executeCommand(ctx *glsp.Context, params *protocol.ExecuteCommandParams) (any, error) {
 	switch params.Command {
 	case CommandShowRendered:
@@ -116,6 +144,27 @@ func (s *Server) executeCommand(ctx *glsp.Context, params *protocol.ExecuteComma
 		return map[string]any{"yaml": string(raw)}, nil
 	}
 	return nil, nil
+}
+
+func (s *Server) didChangeWorkspaceFolders(ctx *glsp.Context, params *protocol.DidChangeWorkspaceFoldersParams) error {
+	var root string
+	if added := params.Event.Added; len(added) > 0 {
+		root = added[0].URI
+	}
+	settings := config.Settings{}
+	if root != "" {
+		if loaded, err := config.LoadFromWorkspace(root); err == nil {
+			settings = loaded
+		}
+	}
+	s.workspaceRoot = root
+	s.applySettings(settings)
+	for _, uri := range s.docs.AllURIs() {
+		if d, ok := s.docs.Get(uri); ok {
+			s.publishDiagnostics(ctx, d)
+		}
+	}
+	return nil
 }
 
 func (s *Server) didChangeConfig(ctx *glsp.Context, params *protocol.DidChangeConfigurationParams) error {
