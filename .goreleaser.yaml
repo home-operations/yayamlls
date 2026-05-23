@@ -55,6 +55,10 @@ changelog:
 
 homebrew_casks:
   - name: yamlls
+    ids:
+      - yamlls
+    binaries:
+      - yamlls
     repository:
       owner: home-operations
       name: homebrew-tap
@@ -62,13 +66,9 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/home-operations/yamlls
     description: YAML language server with pluggable rendering for Flux sources.
-    license: AGPL-3.0
-    binaries:
-      - yamlls
+    # Binaries aren't notarized — strip the quarantine bit so macOS doesn't
+    # block the first run with "developer cannot be verified".
     hooks:
       post:
-        install: |-
-          if OS.mac?
-            system_command "/usr/bin/xattr",
-              args: ["-dr", "com.apple.quarantine", "#{staged_path}/yamlls"]
-          end
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/yamlls"] if OS.mac?
