@@ -243,7 +243,8 @@ func (s *Server) publishWith(notify glsp.NotifyFunc, d *document.Document) {
 	path := uriToPath(d.URI)
 	fileRef := s.resolver.Resolve(d.Text, path)
 
-	var diags []protocol.Diagnostic
+	// nil marshals to `null`; clients keep stale diagnostics on `null`.
+	diags := []protocol.Diagnostic{}
 	if parsed.Err != nil {
 		diags = append(diags, diagnostics.ParseErrorDiagnostic(parsed.Err))
 	}

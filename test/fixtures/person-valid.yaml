@@ -1,0 +1,3 @@
+# yaml-language-server: $schema=./schemas/person.json
+name: Alice
+age: 30
