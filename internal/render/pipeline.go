@@ -73,6 +73,7 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t := time.AfterFunc(p.debounce, func() {
+		defer cancel()
 		out, err := r.Render(ctx, doc)
 		p.mu.Lock()
 		p.cache[doc.URI] = cacheEntry{hash: hash, out: out, err: err}
