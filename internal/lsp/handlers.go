@@ -24,6 +24,8 @@ import (
 const (
 	CommandShowRendered     = "yamlls.showRendered"
 	CommandShowRenderedDiff = "yamlls.showRenderedDiff"
+
+	resultKeyYAML = "yaml"
 )
 
 func (s *Server) didOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
@@ -157,9 +159,9 @@ func (s *Server) executeCommand(ctx *glsp.Context, params *protocol.ExecuteComma
 		raw := s.renderedRawFor(uri)
 		if len(raw) == 0 {
 			s.scheduleRenderForURI(uri)
-			return map[string]any{"yaml": ""}, nil
+			return map[string]any{resultKeyYAML: ""}, nil
 		}
-		return map[string]any{"yaml": string(raw)}, nil
+		return map[string]any{resultKeyYAML: string(raw)}, nil
 	case CommandShowRenderedDiff:
 		uri := commandURIArg(params)
 		if uri == "" {
