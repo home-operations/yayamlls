@@ -33,10 +33,16 @@ func defaultCacheDir() string {
 	return filepath.Join(home, ".cache", "yamlls", "schemas")
 }
 
+// fetchTimeout bounds a single schema fetch. httploader's default client
+// has no timeout, so a hung host would otherwise block the fetch — and the
+// schema lookup waiting on it — indefinitely.
+const fetchTimeout = 30 * time.Second
+
 // InstallDiskLoader replaces jsonschema's http+https loaders with a
 // disk-cached, ETag-revalidating variant. Idempotent.
 func InstallDiskLoader() {
 	installDiskLoaderOnce.Do(func() {
+		httploader.Client = &http.Client{Timeout: fetchTimeout}
 		jsonschema.Loaders["http"] = diskCachedLoad
 		jsonschema.Loaders["https"] = diskCachedLoad
 	})
