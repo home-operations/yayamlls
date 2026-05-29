@@ -31,17 +31,17 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if flags.NArg() == 0 {
-		fmt.Fprintln(stderr, "usage: yamlls validate [--root dir] <file|dir>...")
+		_, _ = fmt.Fprintln(stderr, "usage: yamlls validate [--root dir] <file|dir>...")
 		return 2
 	}
 
 	files, err := collectYAML(flags.Args())
 	if err != nil {
-		fmt.Fprintf(stderr, "yamlls: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "yamlls: %v\n", err)
 		return 2
 	}
 	if len(files) == 0 {
-		fmt.Fprintln(stderr, "yamlls: no YAML files found")
+		_, _ = fmt.Fprintln(stderr, "yamlls: no YAML files found")
 		return 2
 	}
 
@@ -50,7 +50,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	ws, err := config.LoadFromWorkspace(uri.FromPath(root))
 	if err != nil {
-		fmt.Fprintf(stderr, "yamlls: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "yamlls: %v\n", err)
 		return 2
 	}
 
@@ -79,10 +79,10 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	failed := false
 	for _, r := range results {
 		for _, line := range r.errLines {
-			fmt.Fprintln(stderr, line)
+			_, _ = fmt.Fprintln(stderr, line)
 		}
 		for _, line := range r.outLines {
-			fmt.Fprintln(stdout, line)
+			_, _ = fmt.Fprintln(stdout, line)
 		}
 		failed = failed || r.failed
 	}

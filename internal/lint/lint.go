@@ -83,7 +83,10 @@ type docResult struct {
 // is reported only for a user-intended ref (modeline or workspace glob);
 // per-doc Kubernetes auto-detect stays silent so a CRD missing from the
 // mirror doesn't warn.
-func validateOneDoc(doc *ast.DocumentNode, fileRef, text, path string, resolver *schema.Resolver, store *schema.Store) docResult {
+func validateOneDoc(
+	doc *ast.DocumentNode, fileRef, text, path string,
+	resolver *schema.Resolver, store *schema.Store,
+) docResult {
 	ref := schema.FindModelineSchemaForDoc(doc)
 	if ref == "" {
 		ref = fileRef
