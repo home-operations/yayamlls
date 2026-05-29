@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.6](https://github.com/home-operations/yamlls/compare/0.0.5...0.0.6) (2026-05-29)
+
+
+### Features
+
+* add validate command ([866f1ea](https://github.com/home-operations/yamlls/commit/866f1eab4b8ff7ee9846e6c15a3210de4001a25e))
+
+
+### Performance Improvements
+
+* improve multidoc speed ([ea82273](https://github.com/home-operations/yamlls/commit/ea82273abaa16ff8b63c0d962f63da57f4df594b))
+* parallelize validation ([ef6d054](https://github.com/home-operations/yamlls/commit/ef6d0544dbe20d1c1da064fced85bfe13e94151c))
+
+
+### Miscellaneous Chores
+
+* fix lint ([a5f8d07](https://github.com/home-operations/yamlls/commit/a5f8d07587d7eb665161e7803e520433cf705875))
+
 ## [0.0.5](https://github.com/home-operations/yamlls/compare/0.0.4...0.0.5) (2026-05-29)
 
 
