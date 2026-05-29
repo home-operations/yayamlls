@@ -47,6 +47,7 @@ func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocume
 	uri := params.TextDocument.URI
 	s.clearDiagnostics(ctx, uri)
 	s.docs.Close(uri)
+	s.pipeline.Cancel(uri)
 	s.clearRenderState(uri)
 	return nil
 }
