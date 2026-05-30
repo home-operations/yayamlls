@@ -1,6 +1,6 @@
 # yayamlls
 
-YAML language server in Go. Schema-driven diagnostics, completion, and
+**Y**et **A**nother **YAML** **L**anguage **S**erver in Go. Schema-driven diagnostics, completion, and
 hover; pluggable rendering for Flux `HelmRelease` and `Kustomization`
 sources via [home-operations/flate][flate].
 
