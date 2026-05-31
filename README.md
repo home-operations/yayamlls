@@ -66,25 +66,21 @@ Packaged extensions for **VS Code** and **Zed** live in [`editors/`](editors);
 they download the matching `yayamlls` (and `flate`) release binary automatically.
 The snippets below are for editors with built-in LSP support.
 
-### Neovim (nvim-lspconfig)
+### Neovim
+
+Use the built-in `vim.lsp.config`/`vim.lsp.enable` API (0.11+):
 
 ```lua
-local lspconfig = require("lspconfig")
-local configs = require("lspconfig.configs")
+vim.lsp.config("yayamlls", {
+  cmd = { "yayamlls" },
+  filetypes = { "yaml" },
+  root_markers = { ".yayamlls.yaml", ".git" },
+})
 
-if not configs.yayamlls then
-  configs.yayamlls = {
-    default_config = {
-      cmd = { "yayamlls" },
-      filetypes = { "yaml" },
-      root_dir = lspconfig.util.find_git_ancestor,
-      single_file_support = true,
-    },
-  }
-end
-
-lspconfig.yayamlls.setup({})
+vim.lsp.enable("yayamlls")
 ```
+
+With no marker found the server still attaches in single-file mode.
 
 ### VSCode
 
