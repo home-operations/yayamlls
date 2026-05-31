@@ -91,7 +91,7 @@ func flattenValidationError(doc *ast.DocumentNode, verr *jsonschema.ValidationEr
 				Severity: ptr(protocol.DiagnosticSeverityError),
 				Source:   ptr(Source),
 				Message:  fmt.Sprintf("%s (at %s)", e.Message, displayPointer(e.InstanceLocation)),
-				Range:    yamlast.LocateRange(doc, e.InstanceLocation, src),
+				Range:    leafRange(doc, e, src),
 				Data:     dataFor(e),
 			})
 			return
@@ -102,6 +102,56 @@ func flattenValidationError(doc *ast.DocumentNode, verr *jsonschema.ValidationEr
 	}
 	walk(verr)
 	return out
+}
+
+// leafRange anchors a diagnostic on the most specific line. Most errors point
+// at their instance value, but additionalProperties and required report against
+// a parent object — which would anchor on the object's first child. Steer them
+// to the offending key (additionalProperties) or the owning key (required).
+func leafRange(doc *ast.DocumentNode, e *jsonschema.ValidationError, src string) protocol.Range {
+	switch keywordOf(e.KeywordLocation) {
+	case "additionalProperties":
+		if name, ok := additionalPropName(e.Message); ok {
+			if r, ok := yamlast.LocateKey(doc, e.InstanceLocation, name, src); ok {
+				return r
+			}
+		}
+	case "required":
+		if parent, key := splitPointer(e.InstanceLocation); key != "" {
+			if r, ok := yamlast.LocateKey(doc, parent, yamlast.UnescapePointerSegment(key), src); ok {
+				return r
+			}
+		}
+	}
+	return yamlast.LocateRange(doc, e.InstanceLocation, src)
+}
+
+// additionalPropName extracts the first offending property from an
+// "additionalProperties 'x', 'y' not allowed" message.
+func additionalPropName(msg string) (string, bool) {
+	rest, found := strings.CutPrefix(msg, "additionalProperties ")
+	if !found {
+		return "", false
+	}
+	a := strings.IndexByte(rest, '\'')
+	if a < 0 {
+		return "", false
+	}
+	rest = rest[a+1:]
+	b := strings.IndexByte(rest, '\'')
+	if b < 0 {
+		return "", false
+	}
+	return rest[:b], true
+}
+
+// splitPointer splits a JSON pointer into its parent pointer and last segment.
+func splitPointer(ptr string) (parent, key string) {
+	i := strings.LastIndexByte(ptr, '/')
+	if i < 0 {
+		return "", ptr
+	}
+	return ptr[:i], ptr[i+1:]
 }
 
 func dataFor(e *jsonschema.ValidationError) any {

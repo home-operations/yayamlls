@@ -86,13 +86,35 @@ func TestSuppressAction(t *testing.T) {
 	if len(edits) != 1 {
 		t.Fatalf("expected 1 edit, got %d", len(edits))
 	}
-	// The directive is inserted on its own line above the offending line,
-	// matching its two-space indent.
-	if want := "  " + diagnostics.DisableLineComment() + "\n"; edits[0].NewText != want {
+	// The directive trails the offending line so it suppresses that very line
+	// without shifting line numbers.
+	if want := " " + diagnostics.DisableLineComment(); edits[0].NewText != want {
 		t.Errorf("NewText = %q, want %q", edits[0].NewText, want)
 	}
-	if at := (protocol.Position{Line: 1, Character: 0}); edits[0].Range.Start != at || edits[0].Range.End != at {
-		t.Errorf("edit not a zero-width insert at line start: %+v", edits[0].Range)
+	if at := (protocol.Position{Line: 1, Character: uint32(len("  foo: bar"))}); edits[0].Range.Start != at || edits[0].Range.End != at {
+		t.Errorf("edit not a zero-width append at line end: %+v", edits[0].Range)
+	}
+}
+
+func TestSuppressActionCommentLineFallsBackAbove(t *testing.T) {
+	source := diagnostics.Source
+	// The diagnostic anchors on a comment-only line (no code to trail), so the
+	// directive goes on its own line above.
+	diag := protocol.Diagnostic{
+		Range:  protocol.Range{Start: protocol.Position{Line: 0}},
+		Source: &source,
+	}
+	const text = "# yaml-language-server: $schema=x\nname: a\n"
+	got := actions.Compute("file:///x.yaml", text, nil, []protocol.Diagnostic{diag})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(got))
+	}
+	e := got[0].Edit.Changes["file:///x.yaml"][0]
+	if want := diagnostics.DisableLineComment() + "\n"; e.NewText != want {
+		t.Errorf("NewText = %q, want %q", e.NewText, want)
+	}
+	if at := (protocol.Position{Line: 0, Character: 0}); e.Range.Start != at {
+		t.Errorf("expected insert at line start, got %+v", e.Range.Start)
 	}
 }
 

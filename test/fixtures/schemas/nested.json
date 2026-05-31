@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nested",
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "object",
+      "properties": { "hello": { "type": "boolean" } },
+      "required": ["hello"],
+      "additionalProperties": false
+    }
+  }
+}

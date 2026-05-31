@@ -15,6 +15,42 @@ func unescapePointerSegment(s string) string {
 	return strings.ReplaceAll(s, "~0", "~")
 }
 
+// UnescapePointerSegment decodes a single JSON-Pointer segment (~1 -> /,
+// ~0 -> ~).
+func UnescapePointerSegment(s string) string { return unescapePointerSegment(s) }
+
+// LocateKey returns the range of the `key` token within the mapping at
+// parentPtr, for anchoring structural diagnostics (an unknown or missing
+// property) on a specific key line rather than the whole mapping. key is a
+// raw key, already unescaped. ok is false when the mapping or key isn't found.
+func LocateKey(doc *ast.DocumentNode, parentPtr, key, src string) (protocol.Range, bool) {
+	parent, ok := lookup(doc, parentPtr)
+	if !ok {
+		return protocol.Range{}, false
+	}
+	kn := keyNode(parent, key)
+	if kn == nil {
+		return protocol.Range{}, false
+	}
+	return nodeRange(src, kn), true
+}
+
+func keyNode(parent ast.Node, key string) ast.Node {
+	switch n := parent.(type) {
+	case *ast.MappingNode:
+		for _, kv := range n.Values {
+			if mapKeyString(kv.Key) == key {
+				return kv.Key
+			}
+		}
+	case *ast.MappingValueNode:
+		if mapKeyString(n.Key) == key {
+			return n.Key
+		}
+	}
+	return nil
+}
+
 // LocateRange returns the LSP range that covers the node at ptr. src is the
 // document text, needed to translate goccy's rune-based columns into the
 // UTF-16 code units LSP uses. Falls back to the document body's range when
