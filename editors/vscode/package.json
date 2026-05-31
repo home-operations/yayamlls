@@ -1,27 +1,45 @@
 {
   "name": "yayamlls",
   "displayName": "yayamlls",
-  "description": "YAML language server in Go: schema-driven diagnostics, completion, hover, and Flux rendering.",
   "version": "0.1.0",
-  "publisher": "home-operations",
+  "description": "YAML language server in Go: schema-driven diagnostics, completion, hover, and Flux rendering.",
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/home-operations/yayamlls",
     "directory": "editors/vscode"
   },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": ["Programming Languages", "Linters"],
-  "activationEvents": ["onLanguage:yaml"],
+  "publisher": "home-operations",
   "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  },
   "contributes": {
     "languages": [
       {
         "id": "yaml",
-        "aliases": ["YAML", "yaml"],
-        "extensions": [".yaml", ".yml"]
+        "aliases": [
+          "YAML",
+          "yaml"
+        ],
+        "extensions": [
+          ".yaml",
+          ".yml"
+        ]
       }
     ],
     "commands": [
@@ -80,24 +98,21 @@
         },
         "yayamlls.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Trace LSP traffic between VS Code and yayamlls."
         }
       }
     }
   },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
-  },
-  "dependencies": {
-    "vscode-languageclient": "^9.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
-    "typescript": "^5.4.0"
+  "activationEvents": [
+    "onLanguage:yaml"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
   }
 }

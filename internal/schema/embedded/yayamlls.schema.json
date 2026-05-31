@@ -10,10 +10,7 @@
       "type": "object",
       "description": "Map of schema URL or filesystem path to one or more glob patterns. The first pattern that matches a document's path wins.",
       "additionalProperties": {
-        "oneOf": [
-          { "type": "string" },
-          { "type": "array", "items": { "type": "string" } }
-        ]
+        "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
       }
     },
     "catalog": {

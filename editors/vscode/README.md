@@ -24,14 +24,14 @@ vsce publish          # requires a Marketplace publisher + PAT
 
 ## Settings
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `yayamlls.path` | `""` | Absolute path to a `yayamlls` binary. When set, skips the download. |
-| `yayamlls.version` | `"latest"` | Release tag to download (e.g. `"0.0.5"`). |
-| `yayamlls.catalog` | `true` | Enable JSON Schema Store catalog lookups. |
-| `yayamlls.catalogUrl` | `""` | Override the catalog URL. |
-| `yayamlls.schemas` | `{}` | Map of schema URI/path → file globs. |
-| `yayamlls.kubernetes.schemaUrl` | `""` | Override the Kubernetes auto-detect URL template. |
+| Setting                         | Default    | Description                                                         |
+| ------------------------------- | ---------- | ------------------------------------------------------------------- |
+| `yayamlls.path`                 | `""`       | Absolute path to a `yayamlls` binary. When set, skips the download. |
+| `yayamlls.version`              | `"latest"` | Release tag to download (e.g. `"0.0.5"`).                           |
+| `yayamlls.catalog`              | `true`     | Enable JSON Schema Store catalog lookups.                           |
+| `yayamlls.catalogUrl`           | `""`       | Override the catalog URL.                                           |
+| `yayamlls.schemas`              | `{}`       | Map of schema URI/path → file globs.                                |
+| `yayamlls.kubernetes.schemaUrl` | `""`       | Override the Kubernetes auto-detect URL template.                   |
 
 These mirror `.yayamlls.yaml`; the workspace file still applies and takes lower
 precedence than these editor settings.

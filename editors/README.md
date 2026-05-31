@@ -13,10 +13,10 @@ yayamlls_{version}_{os}_{arch}.tar.gz   # linux, darwin
 yayamlls_{version}_{os}_{arch}.zip      # windows
 ```
 
-| Editor | Language | Subdir | Binary source |
-| ------ | -------- | ------ | ------------- |
-| VS Code | TypeScript (`vscode-languageclient`) | [`vscode/`](./vscode) | downloaded to global storage; override with `yayamlls.path` |
-| Zed | Rust → WASM (`zed_extension_api`) | [`zed/`](./zed) | downloaded to the extension work dir; override with `binary.path` |
+| Editor  | Language                             | Subdir                | Binary source                                                     |
+| ------- | ------------------------------------ | --------------------- | ----------------------------------------------------------------- |
+| VS Code | TypeScript (`vscode-languageclient`) | [`vscode/`](./vscode) | downloaded to global storage; override with `yayamlls.path`       |
+| Zed     | Rust → WASM (`zed_extension_api`)    | [`zed/`](./zed)       | downloaded to the extension work dir; override with `binary.path` |
 
 For editors with built-in LSP support (Neovim, Helix) you don't need an
 extension; see the "Editor setup" section of the top-level [README](../README.md).

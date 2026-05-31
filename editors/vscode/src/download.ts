@@ -10,13 +10,8 @@ const execFileP = promisify(execFile);
 /** Maps Node's platform/arch to a GoReleaser asset + the binary inside it. */
 function assetFor(name: string, version: string): { asset: string; binary: string } {
   const osPart =
-    process.platform === "darwin"
-      ? "darwin"
-      : process.platform === "win32"
-        ? "windows"
-        : "linux";
-  const archPart =
-    process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : "";
+    process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "windows" : "linux";
+  const archPart = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : "";
   if (!archPart) {
     throw new Error(`${name} has no build for arch "${process.arch}"`);
   }
@@ -34,10 +29,9 @@ async function resolveVersion(repo: string, requested: string): Promise<string> 
   if (requested && requested !== "latest") {
     return requested;
   }
-  const res = await fetch(
-    `https://api.github.com/repos/${repo}/releases/latest`,
-    { headers: { Accept: "application/vnd.github+json", "User-Agent": "yayamlls-vscode" } },
-  );
+  const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+    headers: { Accept: "application/vnd.github+json", "User-Agent": "yayamlls-vscode" },
+  });
   if (!res.ok) {
     throw new Error(`GitHub API ${res.status} resolving latest ${repo} release`);
   }

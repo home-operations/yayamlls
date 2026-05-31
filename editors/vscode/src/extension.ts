@@ -1,16 +1,10 @@
 import * as fs from "fs/promises";
-import * as path from "path";
-import {
-  commands,
-  ExtensionContext,
-  OutputChannel,
-  window,
-  workspace,
-} from "vscode";
+import { commands, ExtensionContext, OutputChannel, window, workspace } from "vscode";
 import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
+  TransportKind,
 } from "vscode-languageclient/node";
 import { ensureBinary } from "./download";
 
@@ -21,7 +15,7 @@ let client: LanguageClient | undefined;
 let output: OutputChannel;
 
 /** Build the server's initializationOptions from `yayamlls.*` settings. */
-function initializationOptions() {
+function initializationOptions(flatePath: string | undefined) {
   const cfg = workspace.getConfiguration("yayamlls");
   const opts: Record<string, unknown> = {
     catalog: cfg.get<boolean>("catalog", true),
@@ -35,9 +29,9 @@ function initializationOptions() {
   if (schemaUrl) {
     opts.kubernetes = { schemaUrl };
   }
-  // The flate binary is exposed to the server via PATH (see startClient), not
-  // here, so it doesn't clobber renderers.flate settings from .yayamlls.yaml.
-  if (!cfg.get<boolean>("flate.enabled", true)) {
+  if (flatePath) {
+    opts.renderers = { flate: { enabled: true, binary: flatePath } };
+  } else if (!cfg.get<boolean>("flate.enabled", true)) {
     opts.renderers = { flate: { enabled: false } };
   }
   return opts;
@@ -74,7 +68,13 @@ async function resolveCommand(storageDir: string): Promise<string> {
   if (override) {
     return override;
   }
-  return ensureBinary(storageDir, YAMLLS_REPO, "yayamlls", cfg.get<string>("version", "latest"), output);
+  return ensureBinary(
+    storageDir,
+    YAMLLS_REPO,
+    "yayamlls",
+    cfg.get<string>("version", "latest"),
+    output,
+  );
 }
 
 async function startClient(context: ExtensionContext): Promise<void> {
@@ -83,25 +83,13 @@ async function startClient(context: ExtensionContext): Promise<void> {
 
   const command = await resolveCommand(storageDir);
   const flatePath = await resolveFlate(storageDir);
-  // Communication defaults to stdio; leaving transport unset avoids appending
-  // a --stdio flag the server doesn't parse.
   const serverOptions: ServerOptions = {
     command,
+    transport: TransportKind.stdio,
   };
-  // Expose flate on the server's PATH rather than via a renderers.flate.binary
-  // override, so the server's own renderers config (e.g. flate.path in
-  // .yayamlls.yaml) is preserved.
-  if (flatePath) {
-    const dir = path.dirname(flatePath);
-    if (dir && dir !== ".") {
-      serverOptions.options = {
-        env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH ?? ""}` },
-      };
-    }
-  }
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "yaml" }],
-    initializationOptions: initializationOptions(),
+    initializationOptions: initializationOptions(flatePath),
     synchronize: { configurationSection: "yayamlls" },
     outputChannel: output,
   };
@@ -113,10 +101,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
   output = window.createOutputChannel("yayamlls");
   context.subscriptions.push(output);
 
-  // The language client auto-registers the server's executeCommand provider
-  // commands (yayamlls.showRendered*) and forwards the code lens's URI
-  // argument; the server renders and opens the result via window/showDocument.
-  // So only the client-side restart command lives here.
   context.subscriptions.push(
     commands.registerCommand("yayamlls.restart", async () => {
       await client?.stop();
@@ -124,6 +108,22 @@ export async function activate(context: ExtensionContext): Promise<void> {
       await startClient(context).catch((err) =>
         window.showErrorMessage(`yayamlls failed to start: ${err}`),
       );
+    }),
+    // The server exposes yayamlls.showRendered as an executeCommand; forward the
+    // active document URI as its single argument.
+    commands.registerCommand("yayamlls.showRendered", async () => {
+      const uri = window.activeTextEditor?.document.uri.toString();
+      if (!uri || !client) {
+        return;
+      }
+      const rendered = await client.sendRequest("workspace/executeCommand", {
+        command: "yayamlls.showRendered",
+        arguments: [uri],
+      });
+      if (typeof rendered === "string") {
+        const doc = await workspace.openTextDocument({ language: "yaml", content: rendered });
+        await window.showTextDocument(doc, { preview: true });
+      }
     }),
   );
 
