@@ -148,15 +148,18 @@ allowed`), so the settings-only alternative is to override the bundled
 
 With [flate][flate] installed, opening a `HelmRelease` or
 `Kustomization` surfaces schema violations on rendered manifests as
-`[rendered <kind>/<name> @ <jsonptr>]` on the source document. The
-`yayamlls.showRendered` command returns the rendered YAML; in Neovim:
+`[rendered <kind>/<name> @ <jsonptr>]` on the source document. A code lens
+on the resource offers **View rendered** and **Diff rendered**; running it
+opens the result in the editor via a `window/showDocument` request, so no
+client-specific glue is needed.
 
-```lua
-vim.lsp.buf.execute_command({
-  command = "yayamlls.showRendered",
-  arguments = { vim.uri_from_bufnr(0) },
-})
-```
+Clients that open local-file `showDocument` requests display it directly —
+Neovim ≥ 0.11 and VS Code do. Zed currently no-ops local-file `showDocument`
+([zed#53123][zed-showdoc]), so the lens runs but nothing opens; it will work
+unchanged once Zed supports it. Other features (diagnostics, completion, hover,
+code actions) are unaffected everywhere.
+
+[zed-showdoc]: https://github.com/zed-industries/zed/discussions/53123
 
 ### Debugging
 

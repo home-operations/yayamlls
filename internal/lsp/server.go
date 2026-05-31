@@ -30,11 +30,22 @@ type Server struct {
 	renderedRaw      map[string][]byte
 	renderedBaseline map[string][]byte
 
-	// connNotify is captured lazily from the first incoming request so the
-	// async render pipeline can push diagnostics without holding onto a
-	// per-request *glsp.Context.
+	// connNotify and connCall are captured lazily from the first incoming
+	// request so the async render pipeline can push diagnostics, and fire
+	// window/showDocument, without holding onto a per-request *glsp.Context.
 	connMu     sync.Mutex
 	connNotify glsp.NotifyFunc
+	connCall   glsp.CallFunc
+
+	// clientShowDoc records whether the client advertised window/showDocument
+	// at initialize. When set, the showRendered commands open the result in the
+	// editor; otherwise they return it as a payload for the bundled extensions.
+	clientShowDoc bool
+
+	// pendingShow holds show commands that arrived before the render was ready,
+	// keyed by URI; Notify fires the deferred window/showDocument once it lands.
+	showMu      sync.Mutex
+	pendingShow map[string]string
 
 	// pubSeq supersedes async diagnostic publishes: each publish bumps the
 	// per-URI counter, and a goroutine drops its result if a newer one started.
@@ -66,6 +77,7 @@ func New(version string, registry *render.Registry) *Server {
 		renderedRaw:      make(map[string][]byte),
 		renderedBaseline: make(map[string][]byte),
 		pubSeq:           make(map[string]uint64),
+		pendingShow:      make(map[string]string),
 		version:          version,
 	}
 	s.pipeline = render.NewPipeline(registry, s)
@@ -110,6 +122,10 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	}
 	caps.CodeActionProvider = &protocol.CodeActionOptions{
 		CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+	}
+
+	if w := params.Capabilities.Window; w != nil && w.ShowDocument != nil && w.ShowDocument.Support {
+		s.clientShowDoc = true
 	}
 
 	root := pickWorkspaceRoot(params)
@@ -250,6 +266,10 @@ func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
 	}
 	s.rendMu.Unlock()
 
+	if kind, ok := s.takePendingShow(uri); ok {
+		go s.showInEditor(s.currentCall(), uri, kind)
+	}
+
 	d, ok := s.docs.Get(uri)
 	if !ok {
 		return
@@ -269,12 +289,15 @@ func (s *Server) republishOpen() {
 }
 
 func (s *Server) captureNotify(ctx *glsp.Context) {
-	if ctx == nil || ctx.Notify == nil {
+	if ctx == nil {
 		return
 	}
 	s.connMu.Lock()
-	if s.connNotify == nil {
+	if s.connNotify == nil && ctx.Notify != nil {
 		s.connNotify = ctx.Notify
+	}
+	if s.connCall == nil && ctx.Call != nil {
+		s.connCall = ctx.Call
 	}
 	s.connMu.Unlock()
 }
@@ -320,6 +343,12 @@ func (s *Server) currentNotify() glsp.NotifyFunc {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 	return s.connNotify
+}
+
+func (s *Server) currentCall() glsp.CallFunc {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	return s.connCall
 }
 
 // forgetPublish drops a closed document's counter so an in-flight publish

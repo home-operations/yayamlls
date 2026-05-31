@@ -25,6 +25,7 @@ const (
 	CommandShowRenderedDiff = "yayamlls.showRenderedDiff"
 
 	resultKeyYAML = "yaml"
+	resultKeyDiff = "diff"
 )
 
 func (s *Server) didOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
@@ -51,6 +52,8 @@ func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocume
 	s.docs.Close(uri)
 	s.pipeline.Cancel(uri)
 	s.clearRenderState(uri)
+	s.takePendingShow(uri)
+	removeRenderTemps(uri)
 	return nil
 }
 
@@ -153,31 +156,38 @@ func (s *Server) codeLens(ctx *glsp.Context, params *protocol.CodeLensParams) ([
 }
 
 func (s *Server) executeCommand(ctx *glsp.Context, params *protocol.ExecuteCommandParams) (any, error) {
+	s.captureNotify(ctx)
+	var kind string
 	switch params.Command {
 	case CommandShowRendered:
-		uri := commandURIArg(params)
-		if uri == "" {
-			return nil, nil
-		}
-		raw := s.renderedRawFor(uri)
-		if len(raw) == 0 {
-			s.scheduleRenderForURI(uri)
-			return map[string]any{resultKeyYAML: ""}, nil
-		}
-		return map[string]any{resultKeyYAML: string(raw)}, nil
+		kind = renderKindRendered
 	case CommandShowRenderedDiff:
-		uri := commandURIArg(params)
-		if uri == "" {
-			return nil, nil
-		}
-		baseline := s.renderedBaselineFor(uri)
-		current := s.renderedRawFor(uri)
-		if len(current) == 0 {
-			s.scheduleRenderForURI(uri)
-			return map[string]any{"diff": ""}, nil
-		}
-		return map[string]any{"diff": unifiedDiff(uri, baseline, current)}, nil
+		kind = renderKindDiff
+	default:
+		return nil, nil
 	}
+	uri := commandURIArg(params)
+	if uri == "" {
+		return nil, nil
+	}
+
+	// Clients without window/showDocument (the bundled extensions) read the
+	// rendered text from the result payload instead.
+	if !s.clientShowDoc {
+		if content, _ := s.renderedView(uri, kind); content == "" {
+			s.scheduleRenderForURI(uri)
+		}
+		return s.renderPayload(uri, kind), nil
+	}
+
+	// Open it now if the render is ready, otherwise defer until the pipeline
+	// reports back via Notify. Either way the show runs off the message loop.
+	if content, _ := s.renderedView(uri, kind); content != "" {
+		go s.showInEditor(s.currentCall(), uri, kind)
+		return nil, nil
+	}
+	s.setPendingShow(uri, kind)
+	s.scheduleRenderForURI(uri)
 	return nil, nil
 }
 

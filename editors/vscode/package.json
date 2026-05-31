@@ -26,10 +26,6 @@
     ],
     "commands": [
       {
-        "command": "yayamlls.showRendered",
-        "title": "yayamlls: Show Rendered Output"
-      },
-      {
         "command": "yayamlls.restart",
         "title": "yayamlls: Restart Language Server"
       }

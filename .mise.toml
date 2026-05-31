@@ -28,7 +28,7 @@ run = "yamlfmt ."
 [tasks.test]
 description = "Run unit + integration tests"
 depends = ["fmt", "vet"]
-run = "go test ./... -coverprofile cover.out"
+run = "go test ./... -race -coverprofile cover.out"
 
 [tasks.build]
 description = "Build yayamlls binary"
