@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.9](https://github.com/home-operations/yayamlls/compare/0.0.8...0.0.9) (2026-05-31)
+
+
+### Features
+
+* **lsp:** add quick-fix code action to suppress a diagnostic ([e7fe753](https://github.com/home-operations/yayamlls/commit/e7fe75360fdd993c42a36024aa86c4a8bcb4fe7e))
+* **lsp:** advertise supported codeAction kinds ([62b2ef1](https://github.com/home-operations/yayamlls/commit/62b2ef13fbd21bf66d46f6bc145db7b4c0fa450b))
+* **lsp:** open rendered output via window/showDocument ([e9fdec4](https://github.com/home-operations/yayamlls/commit/e9fdec41cef67f7932df817a10c2788f6af4b478))
+* **lsp:** open rendered output via window/showDocument ([5d8f9e5](https://github.com/home-operations/yayamlls/commit/5d8f9e56648bf5cde119a3186031a53ea45a5d74))
+
+
+### Miscellaneous Chores
+
+* **docs:** update neovim lsp instructions for 0.11+ ([d966720](https://github.com/home-operations/yayamlls/commit/d966720b033a6c271030b3437002d614f1720b6d))
+* **docs:** update neovim lsp instructions for 0.11+ ([a4657dd](https://github.com/home-operations/yayamlls/commit/a4657ddeb807a535e02b113624a6612ad1d17726))
+* implement oxfmt ([4945553](https://github.com/home-operations/yayamlls/commit/494555369a94c495b8f46d856aa760caa2f10830))
+* remove default draft-pull-request from release-please config ([66db1b0](https://github.com/home-operations/yayamlls/commit/66db1b062b09860afa98598f1e393e410d372846))
+
 ## [0.0.8](https://github.com/home-operations/yayamlls/compare/0.0.7...0.0.8) (2026-05-31)
 
 
