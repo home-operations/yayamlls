@@ -5,6 +5,7 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/schema"
@@ -12,20 +13,51 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-func Compute(uri string, sch *jsonschema.Schema, diags []protocol.Diagnostic) []protocol.CodeAction {
+func Compute(uri, text string, sch *jsonschema.Schema, diags []protocol.Diagnostic) []protocol.CodeAction {
 	var out []protocol.CodeAction
 	for i := range diags {
 		d := diags[i]
-		data, ok := decode(d.Data)
-		if !ok {
-			continue
-		}
-		switch data.Kind {
-		case "enum":
+		if data, ok := decode(d.Data); ok && data.Kind == "enum" {
 			out = append(out, enumActions(uri, sch, d, data)...)
+		}
+		if a, ok := suppressAction(uri, text, d); ok {
+			out = append(out, a)
 		}
 	}
 	return out
+}
+
+// suppressAction offers to silence a yayamlls diagnostic by inserting a
+// yayamlls-disable-line comment above the offending line, matching its indent.
+func suppressAction(uri, text string, d protocol.Diagnostic) (protocol.CodeAction, bool) {
+	if d.Source == nil || *d.Source != diagnostics.Source {
+		return protocol.CodeAction{}, false
+	}
+	at := protocol.Position{Line: d.Range.Start.Line, Character: 0}
+	kind := protocol.CodeActionKindQuickFix
+	return protocol.CodeAction{
+		Title:       "Suppress this diagnostic",
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{d},
+		Edit: &protocol.WorkspaceEdit{
+			Changes: map[string][]protocol.TextEdit{
+				uri: {{
+					Range:   protocol.Range{Start: at, End: at},
+					NewText: lineIndent(text, d.Range.Start.Line) + diagnostics.DisableLineComment() + "\n",
+				}},
+			},
+		},
+	}, true
+}
+
+// lineIndent returns the leading whitespace of the given 0-based line.
+func lineIndent(text string, line uint32) string {
+	lines := strings.Split(text, "\n")
+	if int(line) >= len(lines) {
+		return ""
+	}
+	l := lines[line]
+	return l[:len(l)-len(strings.TrimLeft(l, " \t"))]
 }
 
 func decode(raw any) (diagnostics.CauseData, bool) {

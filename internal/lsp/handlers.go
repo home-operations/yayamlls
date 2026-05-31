@@ -136,11 +136,12 @@ func (s *Server) documentSymbol(ctx *glsp.Context, params *protocol.DocumentSymb
 
 func (s *Server) codeAction(ctx *glsp.Context, params *protocol.CodeActionParams) (any, error) {
 	uri := params.TextDocument.URI
-	if _, ok := s.docs.Get(uri); !ok {
+	d, ok := s.docs.Get(uri)
+	if !ok {
 		return nil, nil
 	}
 	sch := s.schemaAtCursor(uri, params.Range.Start)
-	return actions.Compute(uri, sch, params.Context.Diagnostics), nil
+	return actions.Compute(uri, d.Text, sch, params.Context.Diagnostics), nil
 }
 
 func (s *Server) codeLens(ctx *glsp.Context, params *protocol.CodeLensParams) ([]protocol.CodeLens, error) {

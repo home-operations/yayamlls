@@ -232,7 +232,7 @@ bar: also-bad
 ## Capabilities
 
 `textDocument/`: diagnostics, completion, hover, foldingRange,
-documentLink, documentSymbol, codeAction (enum quick-fix), codeLens.
+documentLink, documentSymbol, codeAction (enum + suppress quick-fix), codeLens.
 
 `workspace/`: didChangeConfiguration, didChangeWorkspaceFolders, executeCommand.
 

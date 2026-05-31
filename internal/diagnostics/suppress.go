@@ -14,6 +14,12 @@ const (
 	directiveEnable      = "yayamlls-enable"
 )
 
+// DisableLineComment is the YAML comment a codeAction inserts on its own line
+// above an offending line; ParseSuppressions then suppresses the line below it.
+func DisableLineComment() string {
+	return "# " + directiveDisableLine
+}
+
 // Suppressor reports which document lines have diagnostics suppressed via
 // yayamlls-disable directives in YAML comments.
 type Suppressor struct {
