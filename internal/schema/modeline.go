@@ -11,7 +11,7 @@ func FindModelineSchemaForDoc(doc *ast.DocumentNode) string {
 	if doc == nil || doc.Body == nil {
 		return ""
 	}
-	comment := doc.Body.GetComment()
+	comment := headComment(doc.Body)
 	if comment == nil {
 		return ""
 	}
@@ -22,6 +22,27 @@ func FindModelineSchemaForDoc(doc *ast.DocumentNode) string {
 		}
 	}
 	return FindModelineSchema(b.String())
+}
+
+// headComment returns the comment group at the start of a document body.
+// go-yaml attaches a leading comment to the body node for a scalar or a
+// single-key mapping, but to the first entry of a multi-key mapping or
+// sequence.
+func headComment(body ast.Node) *ast.CommentGroupNode {
+	if c := body.GetComment(); c != nil {
+		return c
+	}
+	switch n := body.(type) {
+	case *ast.MappingNode:
+		if len(n.Values) > 0 {
+			return n.Values[0].GetComment()
+		}
+	case *ast.SequenceNode:
+		if len(n.Values) > 0 {
+			return n.Values[0].GetComment()
+		}
+	}
+	return nil
 }
 
 const modelinePrefix = "# yaml-language-server:"

@@ -35,7 +35,13 @@ func LocateCursor(parsed *Parsed, text string, pos protocol.Position) CursorCont
 		}
 	}
 	if doc == nil || doc.Body == nil {
-		return CursorContext{Doc: doc}
+		// No AST to walk (empty or whitespace-only document): fall back to
+		// the text heuristics, same as when there are no docs at all.
+		return CursorContext{
+			Pointer: inferPathByIndent(text, int(pos.Line)),
+			IsKey:   isKeyLine(text, pos),
+			Doc:     doc,
+		}
 	}
 	ctx := CursorContext{Doc: doc}
 
