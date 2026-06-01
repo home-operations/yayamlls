@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.11](https://github.com/home-operations/yayamlls/compare/0.0.10...0.0.11) (2026-06-01)
+
+
+### Bug Fixes
+
+* **zed:** set extension version to 0.0.10 ([edc395d](https://github.com/home-operations/yayamlls/commit/edc395db54346b256bbbd0250a39256704f98be8))
+
+
+### Miscellaneous Chores
+
+* **vscode:** add MIT license for VSCode extension ([58b4c5a](https://github.com/home-operations/yayamlls/commit/58b4c5a0d5a882ac2d6e5cd79227f74516eb59dd))
+* **zed:** add workflow to keep Cargo.lock in sync and update for 0.0.10 ([603d0c0](https://github.com/home-operations/yayamlls/commit/603d0c0e3a0ba2d7f21594d5683d5cae58b337bc))
+
 ## [0.0.10](https://github.com/home-operations/yayamlls/compare/0.0.9...0.0.10) (2026-06-01)
 
 

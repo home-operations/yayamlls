@@ -1,7 +1,7 @@
 id = "yayamlls"
 name = "yayamlls"
 description = "YAML language server in Go: schema-driven diagnostics, completion, hover, and Flux rendering."
-version = "0.0.10"
+version = "0.0.11"
 schema_version = 1
 authors = ["home-operations"]
 repository = "https://github.com/home-operations/yayamlls"
