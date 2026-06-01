@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.0](https://github.com/home-operations/yayamlls/compare/0.0.9...0.1.0) (2026-06-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Update dependency typescript (5.9.3 → 6.0.3) ([#21](https://github.com/home-operations/yayamlls/issues/21))
+* **deps:** Update module github.com/santhosh-tekuri/jsonschema/v5 (v5.3.1 → v6.0.2) ([#22](https://github.com/home-operations/yayamlls/issues/22))
+* **github-release:** Update release node (20.20.2 → 24.16.0) ([#23](https://github.com/home-operations/yayamlls/issues/23))
+
+### Features
+
+* **deps:** Update dependency typescript (5.9.3 → 6.0.3) ([#21](https://github.com/home-operations/yayamlls/issues/21)) ([c0756cc](https://github.com/home-operations/yayamlls/commit/c0756ccd0c2bd64561689fbd43e8dceee0cb69eb))
+* **deps:** update module github.com/goccy/go-yaml (v1.11.3 → v1.19.2) ([#20](https://github.com/home-operations/yayamlls/issues/20)) ([81d9fe3](https://github.com/home-operations/yayamlls/commit/81d9fe3ad430e5ae902519066ce99fa7161e13f1))
+* **deps:** Update module github.com/santhosh-tekuri/jsonschema/v5 (v5.3.1 → v6.0.2) ([#22](https://github.com/home-operations/yayamlls/issues/22)) ([0c730df](https://github.com/home-operations/yayamlls/commit/0c730df25059686192a282d1bb63cfdd3307dbc6))
+* flux substitution support ([e517f18](https://github.com/home-operations/yayamlls/commit/e517f187c02efdfd4b2f3e891a8092c6bd1299ab))
+* **github-release:** Update release node (20.20.2 → 24.16.0) ([#23](https://github.com/home-operations/yayamlls/issues/23)) ([8ecf62c](https://github.com/home-operations/yayamlls/commit/8ecf62c8928c004fc767eaf24dcd46a91cc643b2))
+
+
+### Bug Fixes
+
+* **mise:** update tool lefthook (2.1.8 → 2.1.9) ([015a330](https://github.com/home-operations/yayamlls/commit/015a3305ce21206f0f4f0946d71297e8fc53c84d))
+
 ## [0.0.9](https://github.com/home-operations/yayamlls/compare/0.0.8...0.0.9) (2026-05-31)
 
 
