@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -111,6 +112,43 @@ func Properties(s *jsonschema.Schema) map[string]*jsonschema.Schema {
 	out := make(map[string]*jsonschema.Schema)
 	collectProperties(follow(s), out, 0)
 	return out
+}
+
+// Enums returns the candidate scalar values for a node: enum members and a
+// const, gathered across allOf/anyOf/oneOf branches so a value constrained
+// inside a composition branch or $ref still surfaces. Order is preserved and
+// duplicates are dropped. Returns nil when the schema admits no fixed value.
+func Enums(s *jsonschema.Schema) []any {
+	var out []any
+	seen := make(map[string]bool)
+	add := func(v any) {
+		key := fmt.Sprintf("%v", v)
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, v)
+		}
+	}
+	collectEnums(follow(s), add, 0)
+	return out
+}
+
+func collectEnums(s *jsonschema.Schema, add func(any), depth int) {
+	if s == nil || depth > 16 {
+		return
+	}
+	if s.Enum != nil {
+		for _, v := range s.Enum.Values {
+			add(v)
+		}
+	}
+	if s.Const != nil {
+		add(*s.Const)
+	}
+	for _, branch := range [][]*jsonschema.Schema{s.AllOf, s.AnyOf, s.OneOf} {
+		for _, b := range branch {
+			collectEnums(follow(b), add, depth+1)
+		}
+	}
 }
 
 func collectProperties(s *jsonschema.Schema, into map[string]*jsonschema.Schema, depth int) {

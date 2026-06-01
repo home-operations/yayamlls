@@ -80,6 +80,9 @@ func (s *Server) schemaAtCursor(uri string, pos protocol.Position) *jsonschema.S
 	}
 	sch, ok := s.schemas.Cached(ref, path)
 	if !ok {
+		// Cold start: warm the schema off the message loop so the next
+		// request hits the cache. The store coalesces concurrent fetches.
+		go func() { _, _ = s.schemas.Get(ref, path) }()
 		return nil
 	}
 	return sch

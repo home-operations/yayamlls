@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	yaml "github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/parser"
 	"github.com/home-operations/yayamlls/internal/render"
 )
 
@@ -108,7 +106,7 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 	if runErr != nil {
 		return out, fmt.Errorf("flate %s: %w (stderr: %s)", sub, runErr, truncate(stderr.String(), 512))
 	}
-	manifests, err := parseManifests(stdout.Bytes())
+	manifests, err := render.ParseManifests(stdout.Bytes())
 	if err != nil {
 		return out, fmt.Errorf("flate %s: parse output: %w", sub, err)
 	}
@@ -180,61 +178,6 @@ func (r *Renderer) targetRoot() string {
 	default:
 		return filepath.Join(r.wsRoot, r.root)
 	}
-}
-
-func parseManifests(stdout []byte) ([]render.RenderedManifest, error) {
-	if len(bytes.TrimSpace(stdout)) == 0 {
-		return nil, nil
-	}
-	f, err := parser.ParseBytes(stdout, 0)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]render.RenderedManifest, 0, len(f.Docs))
-	for _, d := range f.Docs {
-		if d.Body == nil {
-			continue
-		}
-		var head struct {
-			APIVersion string `yaml:"apiVersion"`
-			Kind       string `yaml:"kind"`
-			Metadata   struct {
-				Name string `yaml:"name"`
-			} `yaml:"metadata"`
-		}
-		if err := yaml.NodeToValue(d.Body, &head); err != nil {
-			continue
-		}
-		if head.Kind == "" {
-			continue
-		}
-		group, version := splitAPIVersion(head.APIVersion)
-		out = append(out, render.RenderedManifest{
-			AST:  d,
-			GVK:  render.GVK{Group: group, Version: version, Kind: head.Kind},
-			Name: head.Metadata.Name,
-		})
-	}
-	return out, nil
-}
-
-func splitAPIVersion(v string) (group, version string) {
-	if v == "" {
-		return "", ""
-	}
-	if g, ver, ok := splitOnce(v, '/'); ok {
-		return g, ver
-	}
-	return "", v
-}
-
-func splitOnce(s string, sep byte) (string, string, bool) {
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep {
-			return s[:i], s[i+1:], true
-		}
-	}
-	return "", "", false
 }
 
 func truncate(s string, n int) string {

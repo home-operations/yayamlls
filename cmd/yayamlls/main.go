@@ -9,6 +9,7 @@ import (
 	"github.com/home-operations/yayamlls/internal/lsp"
 	"github.com/home-operations/yayamlls/internal/render"
 	"github.com/home-operations/yayamlls/internal/render/flate"
+	"github.com/home-operations/yayamlls/internal/render/subprocess"
 	"github.com/tliron/commonlog"
 	_ "github.com/tliron/commonlog/simple"
 	"github.com/tliron/glsp/server"
@@ -56,6 +57,7 @@ func main() {
 
 	registry := render.NewRegistry()
 	registry.Register(flate.New())
+	registry.SetFactory(subprocess.FromConfig)
 
 	s := lsp.New(version, registry)
 	srv := server.NewServer(s.Handler(), "yayamlls", false)

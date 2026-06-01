@@ -27,8 +27,9 @@ override in `.yayamlls.yaml` to point elsewhere. 404s are silently skipped.
 | Kubernetes auto-detect                         | URL template from apiVersion+kind | `yaml.kubernetesCRDStore` ([datreeio/CRDs-catalog][datree]) |
 | Workspace config file                          | `.yayamlls.yaml`                  | editor settings only                                        |
 | Flux `HelmRelease` / `Kustomization` rendering | via [flate][flate]                | no                                                          |
+| Pluggable renderers (`kustomize`, `helm`, …)   | config-declared subprocess        | no                                                          |
 | Formatting                                     | no                                | yes (Prettier)                                              |
-| Custom YAML tags (`!Ref`, etc.)                | no                                | yes                                                         |
+| Custom YAML tags (`!Ref`, etc.)                | passthrough (skip validation)     | yes                                                         |
 | Diagnostic suppression comments                | yes (`# yayamlls-disable*`)       | yes                                                         |
 | JSON Schema drafts                             | 04, 06, 07, 2019-09, 2020-12      | 04, 07, 2019-09, 2020-12                                    |
 
@@ -194,12 +195,37 @@ catalogUrl: ""
 #     # HelmRelease can resolve a source defined elsewhere. Output is scoped
 #     # to the edited resource by metadata.name. Relative to workspace root.
 #     path: kubernetes
+#   # Declare your own renderer for any kind by shelling out to a command.
+#   # No recompile needed — flate is just the built-in version of this.
+#   kustomize:
+#     match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }
+#     command: ["kustomize", "build", "{dir}"]
+
+# Optional. YAML tags resolved by an external tool (Flux, CloudFormation,
+# Vault, …). Nodes carrying one skip schema validation, since the value
+# present in the file is a placeholder, not the resolved value.
+# customTags:
+#   - "!Ref"
+#   - "!vault"
 ```
 
 By default `flate` renders the edited file's own directory, which fails when a
 `HelmRelease` references a source (such as an `OCIRepository`) defined
 elsewhere. Set `renderers.flate.path` (typically your cluster root) and
 `flate` follows Flux's `spec.path` references to resolve those dependencies.
+
+### Custom renderers
+
+A `renderers:` entry with `match` and `command` declares a subprocess
+renderer, so any tool that prints Kubernetes YAML can drive the rendered-output
+code lens and diagnostics — no recompile. `match` selects documents by `kind`
+(and optional `group`, matched on a group boundary). `command` is the argv to
+run; its stdout is parsed as multi-document YAML. Placeholders: `{dir}` (the
+document's directory), `{file}` (its path), `{name}` (`metadata.name`). The
+command runs with its working directory set to the document's directory.
+A config-declared renderer takes precedence over a built-in one matching the
+same kind, and a missing command binary is treated as "renderer unavailable"
+(silent), just like a missing `flate`.
 
 See [`.yayamlls.yaml.example`](.yayamlls.yaml.example) for a copyable starter.
 

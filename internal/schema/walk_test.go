@@ -60,3 +60,31 @@ func TestResolve_RecursiveRef(t *testing.T) {
 		t.Errorf("recursive $ref did not resolve to the object's properties")
 	}
 }
+
+func TestEnums_AcrossComposition(t *testing.T) {
+	sch := compileSchema(t, `{
+		"type": "object",
+		"properties": {
+			"tier": {
+				"oneOf": [
+					{"enum": ["bronze", "silver"]},
+					{"const": "gold"}
+				]
+			},
+			"plain": {"enum": ["a", "b"]}
+		}
+	}`)
+	got := Enums(Resolve(sch, "/tier"))
+	want := map[string]bool{"bronze": true, "silver": true, "gold": true}
+	if len(got) != 3 {
+		t.Fatalf("tier enums: got %v want bronze/silver/gold", got)
+	}
+	for _, v := range got {
+		if !want[v.(string)] {
+			t.Errorf("unexpected tier value %v", v)
+		}
+	}
+	if plain := Enums(Resolve(sch, "/plain")); len(plain) != 2 {
+		t.Errorf("plain enums: got %v want 2", plain)
+	}
+}

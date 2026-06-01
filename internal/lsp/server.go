@@ -255,7 +255,7 @@ func ptr[T any](v T) *T { return &v }
 
 func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
 	s.settingsMu.Lock()
-	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled()}
+	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(), CustomTags: s.settings.CustomTagNames()}
 	s.settingsMu.Unlock()
 	diags := renderDiagnostics(s.schemas, s.resolver, out, err, opts)
 
@@ -322,7 +322,7 @@ func (s *Server) schedulePublish(d *document.Document) {
 	s.pubMu.Unlock()
 
 	s.settingsMu.Lock()
-	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled()}
+	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(), CustomTags: s.settings.CustomTagNames()}
 	s.settingsMu.Unlock()
 
 	go func() {

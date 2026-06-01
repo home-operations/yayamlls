@@ -58,7 +58,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	resolver.SetSettings(ws)
 	resolver.WaitForCatalog()
 	store := schema.NewStore()
-	opts := diagnostics.Options{FluxSubstitutions: ws.FluxSubstitutionsEnabled()}
+	opts := diagnostics.Options{FluxSubstitutions: ws.FluxSubstitutionsEnabled(), CustomTags: ws.CustomTagNames()}
 
 	// Validation is I/O-bound on schema fetches; run files concurrently so
 	// distinct schemas fetch in parallel. Results are collected per index

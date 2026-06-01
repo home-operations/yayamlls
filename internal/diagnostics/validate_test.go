@@ -186,3 +186,44 @@ age: 30
 		t.Errorf("expected zero diagnostics, got: %+v", diags)
 	}
 }
+
+// replicasIntSchema requires an integer; a !Ref-tagged value decodes to a
+// bare string, which would otherwise fail the type check.
+const replicasIntSchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {"replicas": {"type": "integer"}}
+}`
+
+func TestValidateDoc_CustomTag_SuppressedWhenDeclared(t *testing.T) {
+	sch := compileInlineSchema(t, replicasIntSchema)
+	body := "replicas: !Ref desiredCount\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{CustomTags: []string{"!Ref"}})
+	if len(diags) != 0 {
+		t.Errorf("expected no diagnostics for declared custom tag, got: %+v", diags)
+	}
+}
+
+func TestValidateDoc_CustomTag_FiresWhenNotDeclared(t *testing.T) {
+	sch := compileInlineSchema(t, replicasIntSchema)
+	body := "replicas: !Ref desiredCount\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	if len(diags) == 0 {
+		t.Error("expected a type diagnostic when the tag is not declared")
+	}
+}
+
+func TestValidateDoc_CustomTag_KindHintMatchesLeadingTag(t *testing.T) {
+	sch := compileInlineSchema(t, replicasIntSchema)
+	body := "replicas: !Ref desiredCount\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{CustomTags: []string{"!Ref scalar"}})
+	if len(diags) != 0 {
+		t.Errorf("expected kind-hinted tag to match, got: %+v", diags)
+	}
+}

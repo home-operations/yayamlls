@@ -31,6 +31,22 @@ func StringValueAt(doc *ast.DocumentNode, ptr string) (string, bool) {
 	return s.Value, true
 }
 
+// TagAt returns the YAML tag (e.g. "!Ref") on the node at ptr, if any. A
+// custom-tagged value such as `replicas: !Ref count` decodes to its bare
+// scalar for schema validation; callers use the tag to recognise externally
+// resolved values and skip validating them.
+func TagAt(doc *ast.DocumentNode, ptr string) (string, bool) {
+	node, ok := lookup(doc, ptr)
+	if !ok {
+		return "", false
+	}
+	tn, ok := node.(*ast.TagNode)
+	if !ok || tn.Start == nil {
+		return "", false
+	}
+	return tn.Start.Value, true
+}
+
 // LocateKey returns the range of the `key` token within the mapping at
 // parentPtr, for anchoring structural diagnostics (an unknown or missing
 // property) on a specific key line rather than the whole mapping. key is a

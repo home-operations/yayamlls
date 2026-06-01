@@ -7,8 +7,47 @@ import (
 	"sync"
 
 	yaml "github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/parser"
 	"github.com/home-operations/yayamlls/internal/yamlast"
 )
+
+// ParseManifests splits a renderer's multi-document YAML output into typed
+// manifests, skipping documents with no kind.
+func ParseManifests(stdout []byte) ([]RenderedManifest, error) {
+	if len(strings.TrimSpace(string(stdout))) == 0 {
+		return nil, nil
+	}
+	f, err := parser.ParseBytes(stdout, 0)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RenderedManifest, 0, len(f.Docs))
+	for _, d := range f.Docs {
+		if d.Body == nil {
+			continue
+		}
+		var head struct {
+			APIVersion string `yaml:"apiVersion"`
+			Kind       string `yaml:"kind"`
+			Metadata   struct {
+				Name string `yaml:"name"`
+			} `yaml:"metadata"`
+		}
+		if err := yaml.NodeToValue(d.Body, &head); err != nil {
+			continue
+		}
+		if head.Kind == "" {
+			continue
+		}
+		group, version := splitAPIVersion(head.APIVersion)
+		out = append(out, RenderedManifest{
+			AST:  d,
+			GVK:  GVK{Group: group, Version: version, Kind: head.Kind},
+			Name: head.Metadata.Name,
+		})
+	}
+	return out, nil
+}
 
 // ErrRendererUnavailable signals that a renderer's external tool is not
 // installed. Callers surface no diagnostic for it: a missing optional
@@ -28,9 +67,17 @@ type WorkspaceAware interface {
 	SetWorkspaceRoot(root string)
 }
 
+// Factory builds a renderer from a config entry the registry doesn't already
+// know by name. It returns ok=false when the entry isn't one it can build
+// (e.g. config for a compiled-in renderer, or a malformed entry).
+type Factory func(name string, raw json.RawMessage) (Renderer, bool)
+
 type Registry struct {
 	mu        sync.RWMutex
-	providers []Renderer
+	providers []Renderer // compiled-in renderers (e.g. flate)
+	dynamic   []Renderer // built from config via factory, rebuilt on Configure
+	factory   Factory
+	wsRoot    string
 }
 
 func NewRegistry() *Registry { return &Registry{} }
@@ -41,10 +88,21 @@ func (r *Registry) Register(p Renderer) {
 	r.providers = append(r.providers, p)
 }
 
+// SetFactory installs the builder used to materialise config-declared
+// renderers. Without one, only compiled-in renderers participate.
+func (r *Registry) SetFactory(f Factory) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.factory = f
+}
+
+// For returns the first enabled renderer that matches doc. Config-declared
+// renderers are consulted before compiled-in ones, so a user can override a
+// built-in for a given kind from their workspace config.
 func (r *Registry) For(doc *SourceDocument) Renderer {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	for _, p := range r.providers {
+	for _, p := range append(append([]Renderer(nil), r.dynamic...), r.providers...) {
 		if en, ok := p.(Enableable); ok && !en.IsEnabled() {
 			continue
 		}
@@ -55,28 +113,49 @@ func (r *Registry) For(doc *SourceDocument) Renderer {
 	return nil
 }
 
+// Configure applies each config entry: entries naming a compiled-in renderer
+// configure it in place; the rest are rebuilt into the dynamic set via the
+// factory, so removing an entry drops its renderer.
 func (r *Registry) Configure(configs map[string]json.RawMessage) {
-	r.mu.RLock()
-	providers := append([]Renderer(nil), r.providers...)
-	r.mu.RUnlock()
-	for _, p := range providers {
-		raw, ok := configs[p.Name()]
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	known := make(map[string]bool, len(r.providers))
+	for _, p := range r.providers {
+		known[p.Name()] = true
+		if raw, ok := configs[p.Name()]; ok {
+			if c, ok := p.(Configurable); ok {
+				_ = c.Configure(raw)
+			}
+		}
+	}
+
+	r.dynamic = r.dynamic[:0]
+	if r.factory == nil {
+		return
+	}
+	for name, raw := range configs {
+		if known[name] {
+			continue
+		}
+		p, ok := r.factory(name, raw)
 		if !ok {
 			continue
 		}
-		if c, ok := p.(Configurable); ok {
-			_ = c.Configure(raw)
+		if w, ok := p.(WorkspaceAware); ok && r.wsRoot != "" {
+			w.SetWorkspaceRoot(r.wsRoot)
 		}
+		r.dynamic = append(r.dynamic, p)
 	}
 }
 
 // SetWorkspaceRoot forwards a filesystem path (not a URI) to every
-// WorkspaceAware renderer.
+// WorkspaceAware renderer and retains it for renderers built later.
 func (r *Registry) SetWorkspaceRoot(root string) {
-	r.mu.RLock()
-	providers := append([]Renderer(nil), r.providers...)
-	r.mu.RUnlock()
-	for _, p := range providers {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.wsRoot = root
+	for _, p := range append(append([]Renderer(nil), r.providers...), r.dynamic...) {
 		if w, ok := p.(WorkspaceAware); ok {
 			w.SetWorkspaceRoot(root)
 		}
@@ -86,9 +165,7 @@ func (r *Registry) SetWorkspaceRoot(root string) {
 func (r *Registry) All() []Renderer {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	out := make([]Renderer, len(r.providers))
-	copy(out, r.providers)
-	return out
+	return append(append([]Renderer(nil), r.providers...), r.dynamic...)
 }
 
 func AnalyzeDocument(uri, path, text string) *SourceDocument {

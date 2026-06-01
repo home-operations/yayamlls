@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -68,6 +69,20 @@ func TestMerge_OverrideWins(t *testing.T) {
 	}
 	if string(got.Renderers["flate"]) != `{"binary":"y"}` {
 		t.Errorf("override renderer should win: %s", got.Renderers["flate"])
+	}
+}
+
+func TestMerge_UnionsGlobsForSameSchema(t *testing.T) {
+	base := Settings{Schemas: map[string][]string{"k8s.json": {"a/**", "b/**"}}}
+	override := Settings{Schemas: map[string][]string{"k8s.json": {"b/**", "c/**"}}}
+	got := Merge(base, override)
+	want := []string{"a/**", "b/**", "c/**"}
+	if g := got.Schemas["k8s.json"]; !slices.Equal(g, want) {
+		t.Errorf("globs union wrong: got %v want %v", g, want)
+	}
+	// base must not be mutated by the merge.
+	if g := base.Schemas["k8s.json"]; !slices.Equal(g, []string{"a/**", "b/**"}) {
+		t.Errorf("base mutated: %v", g)
 	}
 }
 

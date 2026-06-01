@@ -23,7 +23,7 @@ func At(text string, pos protocol.Position, sch *jsonschema.Schema) *protocol.Co
 	if ctx.IsKey {
 		return propertyCompletions(target)
 	}
-	return enumCompletions(target)
+	return valueCompletions(target)
 }
 
 func propertyCompletions(s *jsonschema.Schema) *protocol.CompletionList {
@@ -56,19 +56,54 @@ func propertyCompletions(s *jsonschema.Schema) *protocol.CompletionList {
 	return &protocol.CompletionList{Items: items}
 }
 
-func enumCompletions(s *jsonschema.Schema) *protocol.CompletionList {
-	if s.Enum == nil || len(s.Enum.Values) == 0 {
+func valueCompletions(s *jsonschema.Schema) *protocol.CompletionList {
+	values := schema.Enums(s)
+	if len(values) == 0 {
+		values = impliedValues(s)
+	}
+	if len(values) == 0 {
 		return nil
 	}
-	kind := protocol.CompletionItemKindEnumMember
-	items := make([]protocol.CompletionItem, 0, len(s.Enum.Values))
-	for _, e := range s.Enum.Values {
+	kind := protocol.CompletionItemKindValue
+	items := make([]protocol.CompletionItem, 0, len(values))
+	for _, v := range values {
 		items = append(items, protocol.CompletionItem{
-			Label: fmt.Sprintf("%v", e),
+			Label: fmt.Sprintf("%v", v),
 			Kind:  &kind,
 		})
 	}
 	return &protocol.CompletionList{Items: items}
+}
+
+// impliedValues offers values a schema implies without an explicit enum:
+// both booleans for a boolean field, and a default if one is declared.
+func impliedValues(s *jsonschema.Schema) []any {
+	if s == nil {
+		return nil
+	}
+	var out []any
+	if s.Types != nil {
+		for _, t := range s.Types.ToStrings() {
+			if t == "boolean" {
+				out = append(out, true, false)
+			}
+		}
+	}
+	if s.Default != nil {
+		if d := fmt.Sprintf("%v", *s.Default); !containsStr(out, d) {
+			out = append(out, *s.Default)
+		}
+	}
+	return out
+}
+
+func containsStr(vals []any, s string) bool {
+	for _, v := range vals {
+		if fmt.Sprintf("%v", v) == s {
+			return true
+		}
+	}
+	return false
 }
 
 func propertyKind(s *jsonschema.Schema) protocol.CompletionItemKind {

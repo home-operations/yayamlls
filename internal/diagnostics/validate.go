@@ -22,6 +22,10 @@ const Source = "yayamlls"
 // Options controls optional validation behaviours.
 type Options struct {
 	FluxSubstitutions bool
+	// CustomTags are YAML tags (e.g. "!Ref", "!vault") whose values are
+	// resolved by an external tool. A node carrying one is not validated,
+	// since its decoded scalar is a placeholder, not the real value.
+	CustomTags []string
 }
 
 func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema) []protocol.Diagnostic {
@@ -104,6 +108,9 @@ func flattenValidationError(
 					return
 				}
 			}
+			if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
+				return
+			}
 			out = append(out, protocol.Diagnostic{
 				Severity: ptr(protocol.DiagnosticSeverityError),
 				Source:   ptr(Source),
@@ -142,6 +149,25 @@ func leafRange(doc *ast.DocumentNode, e *jsonschema.ValidationError, src string)
 		}
 	}
 	return yamlast.LocateRange(doc, loc, src)
+}
+
+// hasCustomTag reports whether the node at ptr carries one of the declared
+// custom tags. A config entry may include a kind hint ("!Sub sequence"); only
+// the leading tag token is matched.
+func hasCustomTag(doc *ast.DocumentNode, ptr string, tags []string) bool {
+	if len(tags) == 0 {
+		return false
+	}
+	tag, ok := yamlast.TagAt(doc, ptr)
+	if !ok {
+		return false
+	}
+	for _, t := range tags {
+		if name, _, _ := strings.Cut(strings.TrimSpace(t), " "); name == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // splitPointer splits a JSON pointer into its parent pointer and last segment.

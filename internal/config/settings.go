@@ -9,6 +9,9 @@ type Settings struct {
 	Kubernetes        *KubernetesSettings        `json:"kubernetes,omitempty"`
 	Renderers         map[string]json.RawMessage `json:"renderers,omitempty"`
 	FluxSubstitutions *bool                      `json:"fluxSubstitutions,omitempty"`
+	// CustomTags lists YAML tags (e.g. "!Ref", "!vault scalar") whose values
+	// an external tool resolves; nodes carrying them skip schema validation.
+	CustomTags []string `json:"customTags,omitempty"`
 }
 
 type KubernetesSettings struct {
@@ -30,6 +33,14 @@ func (s *Settings) FluxSubstitutionsEnabled() bool {
 		return false
 	}
 	return *s.FluxSubstitutions
+}
+
+// CustomTagNames returns the configured custom YAML tags, or nil.
+func (s *Settings) CustomTagNames() []string {
+	if s == nil {
+		return nil
+	}
+	return s.CustomTags
 }
 
 func Parse(raw json.RawMessage) (Settings, error) {

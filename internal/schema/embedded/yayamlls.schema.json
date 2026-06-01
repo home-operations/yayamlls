@@ -34,14 +34,39 @@
     },
     "renderers": {
       "type": "object",
-      "description": "Per-renderer configuration. Keys match renderer names (e.g. 'flate'); values are renderer-specific.",
+      "description": "Per-renderer configuration. A key names a built-in renderer (e.g. 'flate') to tune it, or declares a new subprocess renderer that shells out to a command. Subprocess renderers require 'match' and 'command'.",
       "additionalProperties": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "description": "Whether this renderer is active. Default: true." },
+          "binary": { "type": "string", "description": "flate: override the flate executable name or path." },
+          "path": { "type": "string", "description": "flate: build root; relative paths anchor at the workspace root." },
+          "match": {
+            "type": "object",
+            "description": "Subprocess renderer: which documents this handles.",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": { "type": "string", "description": "Kubernetes kind to match, e.g. 'Kustomization'." },
+              "group": { "type": "string", "description": "API group to match on a group boundary, e.g. 'kustomize.toolkit.fluxcd.io'. Omit for the core group." }
+            }
+          },
+          "command": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Subprocess renderer: argv to run. Placeholders: {dir} (document's directory), {file} (document path), {name} (metadata.name). stdout is parsed as multi-document YAML."
+          }
+        }
       }
     },
     "fluxSubstitutions": {
       "type": "boolean",
       "description": "Suppress pattern-mismatch errors on values containing Flux PostBuild substitution tokens (${VAR}). Default: false."
+    },
+    "customTags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "YAML tags whose values an external tool resolves (e.g. '!Ref', '!vault'). Nodes carrying one skip schema validation. An optional kind hint after the tag ('!Sub sequence') is ignored for matching."
     }
   }
 }

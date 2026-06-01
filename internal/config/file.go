@@ -95,10 +95,12 @@ func workspacePath(rootURI string) string {
 func Merge(base, override Settings) Settings {
 	out := base
 	if override.Schemas != nil {
-		if out.Schemas == nil {
-			out.Schemas = make(map[string][]string)
+		merged := make(map[string][]string, len(out.Schemas)+len(override.Schemas))
+		maps.Copy(merged, out.Schemas)
+		for key, globs := range override.Schemas {
+			merged[key] = unionStrings(merged[key], globs)
 		}
-		maps.Copy(out.Schemas, override.Schemas)
+		out.Schemas = merged
 	}
 	if override.Catalog != nil {
 		out.Catalog = override.Catalog
@@ -117,6 +119,24 @@ func Merge(base, override Settings) Settings {
 	}
 	if override.FluxSubstitutions != nil {
 		out.FluxSubstitutions = override.FluxSubstitutions
+	}
+	if override.CustomTags != nil {
+		out.CustomTags = unionStrings(out.CustomTags, override.CustomTags)
+	}
+	return out
+}
+
+// unionStrings appends override values to base, dropping duplicates and
+// preserving base order. Used for schema globs and custom tags: a colliding
+// key or a second config layer should widen the set, not replace it.
+func unionStrings(base, override []string) []string {
+	seen := make(map[string]bool, len(base)+len(override))
+	out := make([]string, 0, len(base)+len(override))
+	for _, g := range append(append([]string(nil), base...), override...) {
+		if !seen[g] {
+			seen[g] = true
+			out = append(out, g)
+		}
 	}
 	return out
 }

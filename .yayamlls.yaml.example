@@ -25,3 +25,14 @@ catalog: true
 #     # Scan from this path instead of the edited file's directory, so a
 #     # HelmRelease can resolve a source defined elsewhere. Relative to repo root.
 #     path: kubernetes
+#   # Declare your own renderer by shelling out to any tool that prints
+#   # Kubernetes YAML. Placeholders: {dir}, {file}, {name}.
+#   kustomize:
+#     match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }
+#     command: ["kustomize", "build", "{dir}"]
+
+# YAML tags an external tool resolves; nodes carrying one skip validation.
+#
+# customTags:
+#   - "!Ref"
+#   - "!vault"
