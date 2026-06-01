@@ -38,6 +38,10 @@
       "additionalProperties": {
         "type": "object"
       }
+    },
+    "fluxSubstitutions": {
+      "type": "boolean",
+      "description": "Suppress pattern-mismatch errors on values containing Flux PostBuild substitution tokens (${VAR}). Default: false."
     }
   }
 }

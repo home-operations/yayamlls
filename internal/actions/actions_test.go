@@ -6,7 +6,7 @@ import (
 
 	"github.com/home-operations/yayamlls/internal/actions"
 	"github.com/home-operations/yayamlls/internal/diagnostics"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -16,10 +16,13 @@ func TestEnumQuickFix(t *testing.T) {
 	  "type": "object",
 	  "properties": {"kind": {"enum": ["Pod", "Service", "Deployment"]}}
 	}`
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader([]byte(schemaJSON)))
+	if err != nil {
+		t.Fatal(err)
+	}
 	c := jsonschema.NewCompiler()
-	c.Draft = jsonschema.Draft2020
-	c.ExtractAnnotations = true
-	if err := c.AddResource("mem://schema.json", bytes.NewReader([]byte(schemaJSON))); err != nil {
+	c.DefaultDraft(jsonschema.Draft2020)
+	if err := c.AddResource("mem://schema.json", doc); err != nil {
 		t.Fatal(err)
 	}
 	sch, err := c.Compile("mem://schema.json")

@@ -9,7 +9,106 @@ import (
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+// hostnamePatternSchema is a minimal schema with the Gateway API hostname
+// pattern constraint, matching what triggers the Flux substitution false positive.
+const hostnamePatternSchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"hostname": {
+			"type": "string",
+			"pattern": "^(\\*\\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+		}
+	}
+}`
+
+func compileInlineSchema(t *testing.T, body string) *jsonschema.Schema {
+	t.Helper()
+	doc, err := jsonschema.UnmarshalJSON(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft2020)
+	if err := c.AddResource("mem://test.json", doc); err != nil {
+		t.Fatalf("add resource: %v", err)
+	}
+	sch, err := c.Compile("mem://test.json")
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	return sch
+}
+
+func TestValidateDoc_FluxSubstitution_PatternSuppressedWhenEnabled(t *testing.T) {
+	sch := compileInlineSchema(t, hostnamePatternSchema)
+	body := "hostname: ${EDGE_HOST}\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{FluxSubstitutions: true})
+	for _, d := range diags {
+		if strings.Contains(d.Message, "pattern") {
+			t.Errorf("expected no pattern diagnostic with FluxSubstitutions=true, got: %s", d.Message)
+		}
+	}
+}
+
+func TestValidateDoc_FluxSubstitution_PatternFiredWhenDisabled(t *testing.T) {
+	sch := compileInlineSchema(t, hostnamePatternSchema)
+	body := "hostname: ${EDGE_HOST}\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{FluxSubstitutions: false})
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "pattern") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected pattern diagnostic with FluxSubstitutions=false, got none; diags: %+v", diags)
+	}
+}
+
+func TestValidateDoc_NonFluxPatternMismatch_AlwaysFires(t *testing.T) {
+	sch := compileInlineSchema(t, hostnamePatternSchema)
+	// A genuinely invalid hostname (uppercase letters) with no substitution token.
+	body := "hostname: INVALID_HOST\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{FluxSubstitutions: true})
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "pattern") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected pattern diagnostic for genuinely invalid value, got none; diags: %+v", diags)
+	}
+}
+
+func TestValidateDoc_FluxSubstitution_PartialAndMultipleTokensSuppressed(t *testing.T) {
+	sch := compileInlineSchema(t, hostnamePatternSchema)
+	cases := []string{
+		"${VAR}.example.com",    // suffix after token
+		"prefix-${VAR}",         // prefix before token
+		"${A}-${B}.example.com", // multiple tokens
+	}
+	for _, hostname := range cases {
+		body := "hostname: " + hostname + "\n"
+		doc := yamlast.Parse([]byte(body)).Docs()[0]
+		diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{FluxSubstitutions: true})
+		for _, d := range diags {
+			if strings.Contains(d.Message, "pattern") {
+				t.Errorf("hostname %q: expected no pattern diagnostic with FluxSubstitutions=true, got: %s", hostname, d.Message)
+			}
+		}
+	}
+}
 
 func TestValidate_TypeMismatchProducesDiagnostic(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)

@@ -15,7 +15,7 @@ import (
 	"github.com/home-operations/yayamlls/internal/symbols"
 	fileuri "github.com/home-operations/yayamlls/internal/uri"
 	"github.com/home-operations/yayamlls/internal/yamlast"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )

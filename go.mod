@@ -5,9 +5,10 @@ go 1.26.3
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
+	golang.org/x/text v0.29.0
 )
 
 require (

@@ -6,7 +6,7 @@ import (
 
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -57,12 +57,12 @@ func propertyCompletions(s *jsonschema.Schema) *protocol.CompletionList {
 }
 
 func enumCompletions(s *jsonschema.Schema) *protocol.CompletionList {
-	if len(s.Enum) == 0 {
+	if s.Enum == nil || len(s.Enum.Values) == 0 {
 		return nil
 	}
 	kind := protocol.CompletionItemKindEnumMember
-	items := make([]protocol.CompletionItem, 0, len(s.Enum))
-	for _, e := range s.Enum {
+	items := make([]protocol.CompletionItem, 0, len(s.Enum.Values))
+	for _, e := range s.Enum.Values {
 		items = append(items, protocol.CompletionItem{
 			Label: fmt.Sprintf("%v", e),
 			Kind:  &kind,
@@ -75,22 +75,28 @@ func propertyKind(s *jsonschema.Schema) protocol.CompletionItemKind {
 	if s == nil {
 		return protocol.CompletionItemKindField
 	}
-	for _, t := range s.Types {
-		switch t {
-		case "object":
-			return protocol.CompletionItemKindClass
-		case "array":
-			return protocol.CompletionItemKindEnum
+	if s.Types != nil {
+		for _, t := range s.Types.ToStrings() {
+			switch t {
+			case "object":
+				return protocol.CompletionItemKindClass
+			case "array":
+				return protocol.CompletionItemKindEnum
+			}
 		}
 	}
 	return protocol.CompletionItemKindField
 }
 
 func detail(s *jsonschema.Schema) *string {
-	if s == nil || len(s.Types) == 0 {
+	if s == nil || s.Types == nil {
 		return nil
 	}
-	t := s.Types[0]
+	types := s.Types.ToStrings()
+	if len(types) == 0 {
+		return nil
+	}
+	t := types[0]
 	return &t
 }
 

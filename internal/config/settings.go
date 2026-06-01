@@ -3,11 +3,12 @@ package config
 import "encoding/json"
 
 type Settings struct {
-	Schemas    map[string][]string        `json:"schemas,omitempty"`
-	Catalog    *bool                      `json:"catalog,omitempty"`
-	CatalogURL string                     `json:"catalogUrl,omitempty"`
-	Kubernetes *KubernetesSettings        `json:"kubernetes,omitempty"`
-	Renderers  map[string]json.RawMessage `json:"renderers,omitempty"`
+	Schemas           map[string][]string        `json:"schemas,omitempty"`
+	Catalog           *bool                      `json:"catalog,omitempty"`
+	CatalogURL        string                     `json:"catalogUrl,omitempty"`
+	Kubernetes        *KubernetesSettings        `json:"kubernetes,omitempty"`
+	Renderers         map[string]json.RawMessage `json:"renderers,omitempty"`
+	FluxSubstitutions *bool                      `json:"fluxSubstitutions,omitempty"`
 }
 
 type KubernetesSettings struct {
@@ -22,6 +23,13 @@ func (s *Settings) CatalogEnabled() bool {
 		return true
 	}
 	return *s.Catalog
+}
+
+func (s *Settings) FluxSubstitutionsEnabled() bool {
+	if s == nil || s.FluxSubstitutions == nil {
+		return false
+	}
+	return *s.FluxSubstitutions
 }
 
 func Parse(raw json.RawMessage) (Settings, error) {

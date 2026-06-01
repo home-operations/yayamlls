@@ -14,20 +14,29 @@ import (
 
 const WorkspaceConfigFile = ".yayamlls.yaml"
 
-// LoadFromWorkspace reads `.yayamlls.yaml` from the workspace root. Relative
-// schema paths in the file are anchored at the workspace root so they
-// don't resolve from the open document's directory.
+const WorkspaceConfigFileFallback = ".yamlls.yaml"
+
+// LoadFromWorkspace reads `.yayamlls.yaml` (or `.yamlls.yaml`) from the
+// workspace root. Relative schema paths are anchored at the workspace root.
 func LoadFromWorkspace(rootURI string) (Settings, error) {
 	root := workspacePath(rootURI)
 	if root == "" {
 		return Settings{}, nil
 	}
-	s, err := LoadFile(filepath.Join(root, WorkspaceConfigFile))
-	if err != nil {
-		return s, err
+	for _, name := range []string{WorkspaceConfigFile, WorkspaceConfigFileFallback} {
+		path := filepath.Join(root, name)
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		s, err := LoadFile(path)
+		if err != nil {
+			return s, err
+		}
+		expandSchemaPaths(&s, root)
+		return s, nil
 	}
-	expandSchemaPaths(&s, root)
-	return s, nil
+	return Settings{}, nil
 }
 
 func expandSchemaPaths(s *Settings, root string) {
@@ -105,6 +114,9 @@ func Merge(base, override Settings) Settings {
 			out.Renderers = make(map[string]json.RawMessage)
 		}
 		maps.Copy(out.Renderers, override.Renderers)
+	}
+	if override.FluxSubstitutions != nil {
+		out.FluxSubstitutions = override.FluxSubstitutions
 	}
 	return out
 }

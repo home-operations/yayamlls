@@ -254,7 +254,10 @@ func (s *Server) cancelRequest(ctx *glsp.Context, params *protocol.CancelParams)
 func ptr[T any](v T) *T { return &v }
 
 func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
-	diags := renderDiagnostics(s.schemas, s.resolver, out, err)
+	s.settingsMu.Lock()
+	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled()}
+	s.settingsMu.Unlock()
+	diags := renderDiagnostics(s.schemas, s.resolver, out, err, opts)
 
 	s.rendMu.Lock()
 	s.renderedDiags[uri] = diags
@@ -318,9 +321,13 @@ func (s *Server) schedulePublish(d *document.Document) {
 	seq := s.pubSeq[uri]
 	s.pubMu.Unlock()
 
+	s.settingsMu.Lock()
+	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled()}
+	s.settingsMu.Unlock()
+
 	go func() {
 		// nil marshals to `null`; clients keep stale diagnostics on `null`.
-		diags := lint.Document(d.Text, uriToPath(uri), s.resolver, s.schemas)
+		diags := lint.Document(d.Text, uriToPath(uri), s.resolver, s.schemas, opts)
 		diags = append(diags, s.renderedDiagnosticsFor(uri)...)
 		diags = diagnostics.ParseSuppressions(d.Text).Filter(diags)
 

@@ -3,18 +3,19 @@ package lsp
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/render"
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 // renderDiagnostics validates rendered manifests; rendered docs have no
 // source line, so the kind/name/jsonptr is embedded in each message.
-func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *render.RenderedOutput, err error) []protocol.Diagnostic {
+func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *render.RenderedOutput, err error, opts diagnostics.Options) []protocol.Diagnostic {
 	if err != nil {
 		// The renderer's external tool isn't installed; rendering is an
 		// opt-in extra, so stay silent rather than redlining every Flux doc.
@@ -53,7 +54,7 @@ func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *rend
 		if err := sch.Validate(value); err != nil {
 			var verr *jsonschema.ValidationError
 			if errors.As(err, &verr) {
-				diags = append(diags, flattenRendered(out, m, verr)...)
+				diags = append(diags, flattenRendered(out, m, verr, opts)...)
 			} else {
 				diags = append(diags, protocol.Diagnostic{
 					Severity: ptr(protocol.DiagnosticSeverityError),
@@ -66,19 +67,24 @@ func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *rend
 	return diags
 }
 
-func flattenRendered(out *render.RenderedOutput, m render.RenderedManifest, verr *jsonschema.ValidationError) []protocol.Diagnostic {
+func flattenRendered(out *render.RenderedOutput, m render.RenderedManifest, verr *jsonschema.ValidationError, opts diagnostics.Options) []protocol.Diagnostic {
 	var diags []protocol.Diagnostic
 	var walk func(*jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			loc := e.InstanceLocation
+			if opts.FluxSubstitutions && diagnostics.Keyword(e) == "pattern" {
+				if v, ok := yamlast.StringValueAt(m.AST, diagnostics.Pointer(e.InstanceLocation)); ok && strings.Contains(v, "${") {
+					return
+				}
+			}
+			loc := diagnostics.Pointer(e.InstanceLocation)
 			if loc == "" {
 				loc = "/"
 			}
 			diags = append(diags, protocol.Diagnostic{
 				Severity: ptr(protocol.DiagnosticSeverityError),
 				Source:   ptr(renderSource(out)),
-				Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, e.Message),
+				Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, diagnostics.Message(e)),
 			})
 			return
 		}

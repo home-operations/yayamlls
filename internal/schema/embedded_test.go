@@ -1,32 +1,11 @@
 package schema
 
 import (
-	"io"
-	"strings"
 	"testing"
-
-	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
 func TestEmbeddedYamllsSchema_LoadsAndCompiles(t *testing.T) {
-	installEmbeddedLoader()
-	loader := jsonschema.Loaders["embedded"]
-	if loader == nil {
-		t.Fatal("embedded loader not registered")
-	}
-	rc, err := loader(EmbeddedYamllsSchemaURL)
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	body, _ := io.ReadAll(rc)
-	_ = rc.Close()
-	if !strings.Contains(string(body), "kubernetes") {
-		t.Errorf("embedded schema body looks wrong: %s", body[:200])
-	}
-
-	c := jsonschema.NewCompiler()
-	c.Draft = jsonschema.Draft2020
-	sch, err := c.Compile(EmbeddedYamllsSchemaURL)
+	sch, err := NewStore().Get(EmbeddedYamllsSchemaURL, "")
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
