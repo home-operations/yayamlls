@@ -24,7 +24,7 @@ const docConcurrency = 8
 // user-intended ref. It does not apply yayamlls-disable suppressions;
 // callers filter, so the LSP server can suppress rendered diagnostics in
 // the same pass.
-func Document(text, path string, resolver *schema.Resolver, store *schema.Store) []protocol.Diagnostic {
+func Document(text, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options) []protocol.Diagnostic {
 	parsed := yamlast.Parse([]byte(text))
 	fileRef := resolver.Resolve(text, path)
 
@@ -41,7 +41,7 @@ func Document(text, path string, resolver *schema.Resolver, store *schema.Store)
 	switch len(docs) {
 	case 0:
 	case 1:
-		results[0] = validateOneDoc(docs[0], fileRef, text, path, resolver, store)
+		results[0] = validateOneDoc(docs[0], fileRef, text, path, resolver, store, opts)
 	default:
 		var wg sync.WaitGroup
 		sem := make(chan struct{}, docConcurrency)
@@ -51,7 +51,7 @@ func Document(text, path string, resolver *schema.Resolver, store *schema.Store)
 			go func(i int, doc *ast.DocumentNode) {
 				defer wg.Done()
 				defer func() { <-sem }()
-				results[i] = validateOneDoc(doc, fileRef, text, path, resolver, store)
+				results[i] = validateOneDoc(doc, fileRef, text, path, resolver, store, opts)
 			}(i, doc)
 		}
 		wg.Wait()
@@ -85,7 +85,7 @@ type docResult struct {
 // mirror doesn't warn.
 func validateOneDoc(
 	doc *ast.DocumentNode, fileRef, text, path string,
-	resolver *schema.Resolver, store *schema.Store,
+	resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
 ) docResult {
 	ref := schema.FindModelineSchemaForDoc(doc)
 	if ref == "" {
@@ -105,7 +105,7 @@ func validateOneDoc(
 		}
 		return docResult{}
 	}
-	return docResult{diags: diagnostics.ValidateDoc(doc, sch, text)}
+	return docResult{diags: diagnostics.ValidateDoc(doc, sch, text, opts)}
 }
 
 // SchemaLoadDiagnostic is the file-level warning emitted when a

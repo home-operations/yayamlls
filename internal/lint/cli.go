@@ -58,6 +58,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	resolver.SetSettings(ws)
 	resolver.WaitForCatalog()
 	store := schema.NewStore()
+	opts := diagnostics.Options{FluxSubstitutions: ws.FluxSubstitutionsEnabled()}
 
 	// Validation is I/O-bound on schema fetches; run files concurrently so
 	// distinct schemas fetch in parallel. Results are collected per index
@@ -71,7 +72,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		go func(i int, p string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			results[i] = validateFile(p, resolver, store)
+			results[i] = validateFile(p, resolver, store, opts)
 		}(i, p)
 	}
 	wg.Wait()
@@ -102,13 +103,13 @@ type fileResult struct {
 	failed   bool
 }
 
-func validateFile(path string, resolver *schema.Resolver, store *schema.Store) fileResult {
+func validateFile(path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options) fileResult {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return fileResult{errLines: []string{"yayamlls: " + err.Error()}, failed: true}
 	}
 	text := string(b)
-	diags := Document(text, path, resolver, store)
+	diags := Document(text, path, resolver, store, opts)
 	diags = diagnostics.ParseSuppressions(text).Filter(diags)
 
 	var res fileResult
@@ -164,7 +165,7 @@ func findRoot(file string) string {
 		dir = abs
 	}
 	for {
-		for _, marker := range []string{config.WorkspaceConfigFile, ".git"} {
+		for _, marker := range []string{config.WorkspaceConfigFile, config.WorkspaceConfigFileFallback, ".git"} {
 			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
 				return dir
 			}
