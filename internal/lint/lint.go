@@ -24,7 +24,9 @@ const docConcurrency = 8
 // user-intended ref. It does not apply yayamlls-disable suppressions;
 // callers filter, so the LSP server can suppress rendered diagnostics in
 // the same pass.
-func Document(text, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options) []protocol.Diagnostic {
+func Document(
+	text, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
+) []protocol.Diagnostic {
 	parsed := yamlast.Parse([]byte(text))
 	fileRef := resolver.Resolve(text, path)
 

@@ -87,7 +87,9 @@ type CauseData struct {
 
 // flattenValidationError emits one diagnostic per leaf cause. Leaves
 // carry the actionable message; root nodes are generic wrappers.
-func flattenValidationError(doc *ast.DocumentNode, verr *jsonschema.ValidationError, src string, opts Options) []protocol.Diagnostic {
+func flattenValidationError(
+	doc *ast.DocumentNode, verr *jsonschema.ValidationError, src string, opts Options,
+) []protocol.Diagnostic {
 	var out []protocol.Diagnostic
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
