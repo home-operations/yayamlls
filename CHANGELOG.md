@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.0](https://github.com/home-operations/yayamlls/compare/0.0.9...0.1.0) (2026-06-01)
+## [0.0.10](https://github.com/home-operations/yayamlls/compare/0.0.9...0.0.10) (2026-06-01)
 
 
 ### ⚠ BREAKING CHANGES
