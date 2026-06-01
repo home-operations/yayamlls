@@ -18,7 +18,34 @@
       "include-component-in-tag": false,
       "include-v-in-tag": false,
       "include-v-in-release-name": false,
-      "always-update": true
+      "always-update": true,
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "editors/zed/extension.toml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "editors/zed/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "json",
+          "path": "editors/vscode/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "editors/vscode/package-lock.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "editors/vscode/package-lock.json",
+          "jsonpath": "$.packages[''].version"
+        }
+      ]
     }
   },
   "changelog-sections": [
