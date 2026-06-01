@@ -10,7 +10,7 @@ import (
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -136,14 +136,14 @@ func enumActions(
 		return nil
 	}
 	target := schema.Resolve(root, data.InstanceLocation)
-	if target == nil || len(target.Enum) == 0 {
+	if target == nil || target.Enum == nil || len(target.Enum.Values) == 0 {
 		return nil
 	}
-	out := make([]protocol.CodeAction, 0, len(target.Enum))
-	for _, v := range target.Enum {
+	out := make([]protocol.CodeAction, 0, len(target.Enum.Values))
+	for _, v := range target.Enum.Values {
 		newText := renderEnumValue(v)
 		kind := protocol.CodeActionKindQuickFix
-		isPreferred := len(target.Enum) == 1
+		isPreferred := len(target.Enum.Values) == 1
 		action := protocol.CodeAction{
 			Title:       fmt.Sprintf("Replace with %s", newText),
 			Kind:        &kind,

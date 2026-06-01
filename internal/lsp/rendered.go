@@ -8,7 +8,7 @@ import (
 	"github.com/home-operations/yayamlls/internal/render"
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -71,14 +71,14 @@ func flattenRendered(out *render.RenderedOutput, m render.RenderedManifest, verr
 	var walk func(*jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			loc := e.InstanceLocation
+			loc := diagnostics.Pointer(e.InstanceLocation)
 			if loc == "" {
 				loc = "/"
 			}
 			diags = append(diags, protocol.Diagnostic{
 				Severity: ptr(protocol.DiagnosticSeverityError),
 				Source:   ptr(renderSource(out)),
-				Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, e.Message),
+				Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, diagnostics.Message(e)),
 			})
 			return
 		}

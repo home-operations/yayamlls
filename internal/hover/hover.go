@@ -6,7 +6,7 @@ import (
 
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -36,8 +36,8 @@ func renderHoverBody(s *jsonschema.Schema, ptr string) string {
 		header = "/"
 	}
 	fmt.Fprintf(&b, "**`%s`**", header)
-	if len(s.Types) > 0 {
-		fmt.Fprintf(&b, " — _%s_", strings.Join(s.Types, " | "))
+	if s.Types != nil {
+		fmt.Fprintf(&b, " — _%s_", strings.Join(s.Types.ToStrings(), " | "))
 	}
 	b.WriteString("\n\n")
 	if s.Title != "" {
@@ -47,17 +47,17 @@ func renderHoverBody(s *jsonschema.Schema, ptr string) string {
 		b.WriteString(s.Description)
 		b.WriteString("\n\n")
 	}
-	if len(s.Enum) > 0 {
+	if s.Enum != nil && len(s.Enum.Values) > 0 {
 		b.WriteString("**Allowed values:** ")
-		parts := make([]string, 0, len(s.Enum))
-		for _, e := range s.Enum {
+		parts := make([]string, 0, len(s.Enum.Values))
+		for _, e := range s.Enum.Values {
 			parts = append(parts, fmt.Sprintf("`%v`", e))
 		}
 		b.WriteString(strings.Join(parts, ", "))
 		b.WriteString("\n")
 	}
 	if s.Default != nil {
-		fmt.Fprintf(&b, "**Default:** `%v`\n", s.Default)
+		fmt.Fprintf(&b, "**Default:** `%v`\n", *s.Default)
 	}
 	return strings.TrimSpace(b.String())
 }

@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/home-operations/yayamlls/internal/uri"
-	"github.com/santhosh-tekuri/jsonschema/v5"
-	_ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // negativeTTL keeps CRDs missing from the configured mirror from causing
@@ -18,6 +17,7 @@ const negativeTTL = 5 * time.Minute
 
 type Store struct {
 	mu       sync.Mutex
+	loader   jsonschema.URLLoader
 	compiled map[string]*jsonschema.Schema
 	failures map[string]failure
 	inflight map[string]*inflightCompile
@@ -38,12 +38,22 @@ type inflightCompile struct {
 }
 
 func NewStore() *Store {
-	InstallDiskLoader()
-	installEmbeddedLoader()
 	return &Store{
+		loader:   newURLLoader(),
 		compiled: make(map[string]*jsonschema.Schema),
 		failures: make(map[string]failure),
 		inflight: make(map[string]*inflightCompile),
+	}
+}
+
+// newURLLoader builds the scheme loader shared by every compile.
+func newURLLoader() jsonschema.URLLoader {
+	disk := newDiskLoader()
+	return jsonschema.SchemeURLLoader{
+		"file":     jsonschema.FileLoader{},
+		"http":     disk,
+		"https":    disk,
+		"embedded": embeddedLoader{},
 	}
 }
 
@@ -91,8 +101,8 @@ func (s *Store) Get(ref, docPath string) (*jsonschema.Schema, error) {
 	// and holding the mutex would stall every other schema lookup behind a
 	// single slow host.
 	c := jsonschema.NewCompiler()
-	c.Draft = jsonschema.Draft2020
-	c.ExtractAnnotations = true
+	c.DefaultDraft(jsonschema.Draft2020)
+	c.UseLoader(s.loader)
 	sch, err := c.Compile(key)
 
 	s.mu.Lock()

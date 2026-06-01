@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // Resolve walks root to the subschema at the JSON Pointer ptr, unwrapping
@@ -39,8 +39,8 @@ func follow(s *jsonschema.Schema) *jsonschema.Schema {
 			s = s.Ref
 		case s.RecursiveRef != nil:
 			s = s.RecursiveRef
-		case s.DynamicRef != nil:
-			s = s.DynamicRef
+		case s.DynamicRef != nil && s.DynamicRef.Ref != nil:
+			s = s.DynamicRef.Ref
 		default:
 			return s
 		}

@@ -4,11 +4,9 @@ import (
 	"bytes"
 	_ "embed"
 	"errors"
-	"io"
 	"strings"
-	"sync"
 
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 //go:embed embedded/yayamlls.schema.json
@@ -16,17 +14,15 @@ var yayamllsSchemaJSON []byte
 
 const EmbeddedYamllsSchemaURL = "embedded://yayamlls/yayamlls.schema.json"
 
-var installEmbeddedOnce sync.Once
+// embeddedLoader is a jsonschema.URLLoader serving the built-in yayamlls
+// config schema for embedded:// URLs.
+type embeddedLoader struct{}
 
-func installEmbeddedLoader() {
-	installEmbeddedOnce.Do(func() {
-		jsonschema.Loaders["embedded"] = func(url string) (io.ReadCloser, error) {
-			if url == EmbeddedYamllsSchemaURL {
-				return io.NopCloser(bytes.NewReader(yayamllsSchemaJSON)), nil
-			}
-			return nil, errors.New("unknown embedded resource: " + url)
-		}
-	})
+func (embeddedLoader) Load(url string) (any, error) {
+	if url == EmbeddedYamllsSchemaURL {
+		return jsonschema.UnmarshalJSON(bytes.NewReader(yayamllsSchemaJSON))
+	}
+	return nil, errors.New("unknown embedded resource: " + url)
 }
 
 func isYamllsConfigPath(docPath string) bool {

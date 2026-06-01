@@ -4,14 +4,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func compileSchema(t *testing.T, body string) *jsonschema.Schema {
 	t.Helper()
+	doc, err := jsonschema.UnmarshalJSON(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
 	c := jsonschema.NewCompiler()
-	c.Draft = jsonschema.Draft2020
-	if err := c.AddResource("mem://test.json", strings.NewReader(body)); err != nil {
+	c.DefaultDraft(jsonschema.Draft2020)
+	if err := c.AddResource("mem://test.json", doc); err != nil {
 		t.Fatalf("add resource: %v", err)
 	}
 	sch, err := c.Compile("mem://test.json")

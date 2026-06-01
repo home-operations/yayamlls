@@ -30,15 +30,13 @@ func TestDiskCachedLoad_ServesFromCacheAfterFirstHit(t *testing.T) {
 	CacheDir = tmp
 	t.Cleanup(func() { CacheDir = prev })
 
-	InstallDiskLoader()
+	loader := newDiskLoader()
 	url := srv.URL + "/schema.json"
 
-	rc, err := diskCachedLoad(url)
+	got, err := loader.loadBytes(url)
 	if err != nil {
 		t.Fatalf("first load: %v", err)
 	}
-	got, _ := io.ReadAll(rc)
-	_ = rc.Close()
 	if string(got) != body {
 		t.Errorf("body = %q, want %q", got, body)
 	}
@@ -46,12 +44,10 @@ func TestDiskCachedLoad_ServesFromCacheAfterFirstHit(t *testing.T) {
 		t.Errorf("expected 1 origin hit, got %d", hits)
 	}
 
-	rc, err = diskCachedLoad(url)
+	got, err = loader.loadBytes(url)
 	if err != nil {
 		t.Fatalf("second load: %v", err)
 	}
-	got, _ = io.ReadAll(rc)
-	_ = rc.Close()
 	if string(got) != body {
 		t.Errorf("cached body = %q, want %q", got, body)
 	}
