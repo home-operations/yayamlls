@@ -1,0 +1,42 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Update Cargo.lock
+
+on:
+  push:
+    branches:
+      - "release-please--**"
+    paths:
+      - editors/zed/Cargo.toml
+
+jobs:
+  update-cargo-lock:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Generate Token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Update Cargo.lock
+        working-directory: editors/zed
+        run: cargo update --workspace
+
+      - name: Commit and push
+        run: |
+          git config user.name "home-operations-bot[bot]"
+          git config user.email "home-operations-bot[bot]@users.noreply.github.com"
+          git add editors/zed/Cargo.lock
+          git diff --staged --quiet && exit 0
+          git commit -m "chore(zed): update Cargo.lock"
+          git push
