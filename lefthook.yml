@@ -1,0 +1,6 @@
+pre-commit:
+  commands:
+    fmt:
+      run: go fmt ./...
+    golangci-lint:
+      run: golangci-lint run

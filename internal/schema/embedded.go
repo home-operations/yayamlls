@@ -32,5 +32,6 @@ func isYamllsConfigPath(docPath string) bool {
 	if i := strings.LastIndex(docPath, "/"); i >= 0 {
 		docPath = docPath[i+1:]
 	}
-	return docPath == ".yayamlls.yaml" || docPath == ".yayamlls.yml"
+	return docPath == ".yayamlls.yaml" || docPath == ".yayamlls.yml" ||
+		docPath == ".yamlls.yaml" || docPath == ".yamlls.yml"
 }

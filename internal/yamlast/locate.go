@@ -19,6 +19,18 @@ func unescapePointerSegment(s string) string {
 // ~0 -> ~).
 func UnescapePointerSegment(s string) string { return unescapePointerSegment(s) }
 
+func StringValueAt(doc *ast.DocumentNode, ptr string) (string, bool) {
+	node, ok := lookup(doc, ptr)
+	if !ok {
+		return "", false
+	}
+	s, ok := node.(*ast.StringNode)
+	if !ok {
+		return "", false
+	}
+	return s.Value, true
+}
+
 // LocateKey returns the range of the `key` token within the mapping at
 // parentPtr, for anchoring structural diagnostics (an unknown or missing
 // property) on a specific key line rather than the whole mapping. key is a

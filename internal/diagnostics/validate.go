@@ -19,6 +19,11 @@ var errPrinter = message.NewPrinter(language.English)
 
 const Source = "yayamlls"
 
+// Options controls optional validation behaviours.
+type Options struct {
+	FluxSubstitutions bool
+}
+
 func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema) []protocol.Diagnostic {
 	if parsed == nil {
 		return nil
@@ -31,7 +36,7 @@ func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema) []protocol.Diagnos
 		return out
 	}
 	for _, doc := range parsed.Docs() {
-		out = append(out, validateDoc(doc, sch, parsed.Text)...)
+		out = append(out, validateDoc(doc, sch, parsed.Text, Options{})...)
 	}
 	return out
 }
@@ -39,11 +44,11 @@ func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema) []protocol.Diagnos
 // ValidateDoc runs schema validation against a single YAML document. src is
 // the document text, used to place diagnostics at UTF-16 columns. Returns
 // nil when sch is nil or the doc validates cleanly.
-func ValidateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string) []protocol.Diagnostic {
+func ValidateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string, opts Options) []protocol.Diagnostic {
 	if sch == nil {
 		return nil
 	}
-	return validateDoc(doc, sch, src)
+	return validateDoc(doc, sch, src, opts)
 }
 
 // ParseErrorDiagnostic produces the file-level diagnostic for a YAML
@@ -53,7 +58,7 @@ func ParseErrorDiagnostic(err error) protocol.Diagnostic {
 	return parseErrorDiag(err)
 }
 
-func validateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string) []protocol.Diagnostic {
+func validateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string, opts Options) []protocol.Diagnostic {
 	value, err := yamlast.Decode(doc)
 	if err != nil {
 		return []protocol.Diagnostic{{
@@ -66,7 +71,7 @@ func validateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string) []pr
 	if err := sch.Validate(value); err != nil {
 		var verr *jsonschema.ValidationError
 		if errors.As(err, &verr) {
-			return flattenValidationError(doc, verr, src)
+			return flattenValidationError(doc, verr, src, opts)
 		}
 		return []protocol.Diagnostic{{
 			Severity: ptr(protocol.DiagnosticSeverityError),
@@ -87,11 +92,18 @@ type CauseData struct {
 
 // flattenValidationError emits one diagnostic per leaf cause. Leaves
 // carry the actionable message; root nodes are generic wrappers.
-func flattenValidationError(doc *ast.DocumentNode, verr *jsonschema.ValidationError, src string) []protocol.Diagnostic {
+func flattenValidationError(
+	doc *ast.DocumentNode, verr *jsonschema.ValidationError, src string, opts Options,
+) []protocol.Diagnostic {
 	var out []protocol.Diagnostic
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
+			if opts.FluxSubstitutions && keyword(e) == "pattern" {
+				if v, ok := yamlast.StringValueAt(doc, Pointer(e.InstanceLocation)); ok && strings.Contains(v, "${") {
+					return
+				}
+			}
 			out = append(out, protocol.Diagnostic{
 				Severity: ptr(protocol.DiagnosticSeverityError),
 				Source:   ptr(Source),
@@ -169,7 +181,11 @@ func escapePointerSegment(s string) string {
 	return strings.ReplaceAll(s, "/", "~1")
 }
 
-// keyword returns the JSON Schema keyword that produced the error.
+// Keyword returns the JSON Schema keyword that produced the error.
+func Keyword(e *jsonschema.ValidationError) string {
+	return keyword(e)
+}
+
 func keyword(e *jsonschema.ValidationError) string {
 	kp := e.ErrorKind.KeywordPath()
 	if len(kp) == 0 {
