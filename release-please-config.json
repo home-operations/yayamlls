@@ -26,11 +26,6 @@
           "jsonpath": "$.version"
         },
         {
-          "type": "toml",
-          "path": "editors/zed/Cargo.toml",
-          "jsonpath": "$.package.version"
-        },
-        {
           "type": "json",
           "path": "editors/vscode/package.json",
           "jsonpath": "$.version"

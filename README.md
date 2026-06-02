@@ -149,6 +149,21 @@ allowed`), so the settings-only alternative is to override the bundled
 }
 ```
 
+### Gram
+
+[Gram](https://gram-editor.com) is a Zed fork that installs Zed extensions, so use
+the same [`editors/zed`](editors/zed) extension with the settings above. Gram
+compiles it to WASM locally at install time, so it needs a Rust toolchain that can
+target WASM (`rustup target add wasm32-wasip2`) and `clang`; see the
+[Gram install docs][gram-install].
+
+Install via the Extension Gallery (`gram::Extensions`) → **Install Local**,
+selecting the [`editors/zed`](editors/zed) directory. **Install From URL** clones
+the repo and reads `extension.toml` from its root, so it can't reach the
+`editors/zed` subdirectory; use Install Local.
+
+[gram-install]: https://gram-editor.com/docs/extensions/installing-extensions/
+
 ### Flux rendering
 
 With [flate][flate] installed, opening a `HelmRelease` or
