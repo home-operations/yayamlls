@@ -1,7 +1,7 @@
 {
   "name": "yayamlls",
   "displayName": "yayamlls",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "YAML language server in Go: schema-driven diagnostics, completion, hover, and Flux rendering.",
   "categories": [
     "Linters",

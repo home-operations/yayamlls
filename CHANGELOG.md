@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.13](https://github.com/home-operations/yayamlls/compare/0.0.12...0.0.13) (2026-06-03)
+
+
+### Features
+
+* **deps:** update module golang.org/x/text (v0.29.0 → v0.37.0) ([#27](https://github.com/home-operations/yayamlls/issues/27)) ([6d3d58e](https://github.com/home-operations/yayamlls/commit/6d3d58e563dbeac6e343c9abc3d1fa7b5272fe37))
+
 ## [0.0.12](https://github.com/home-operations/yayamlls/compare/0.0.11...0.0.12) (2026-06-03)
 
 
