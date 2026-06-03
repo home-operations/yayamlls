@@ -33,24 +33,61 @@ func unescape(s string) string {
 	return strings.ReplaceAll(s, "~0", "~")
 }
 
+// follow unwraps a $ref chain, but stops at a node that carries its own
+// keywords: under draft 2020-12 a $ref and its sibling keywords merge, so
+// jumping straight to the ref target would discard the siblings.
 func follow(s *jsonschema.Schema) *jsonschema.Schema {
 	for i := 0; s != nil && i < 32; i++ {
-		switch {
-		case s.Ref != nil:
-			s = s.Ref
-		case s.RecursiveRef != nil:
-			s = s.RecursiveRef
-		case s.DynamicRef != nil && s.DynamicRef.Ref != nil:
-			s = s.DynamicRef.Ref
-		default:
+		ref := directRef(s)
+		if ref == nil || carriesOwnKeywords(s) {
 			return s
 		}
+		s = ref
 	}
 	return s
 }
 
+func directRef(s *jsonschema.Schema) *jsonschema.Schema {
+	switch {
+	case s.Ref != nil:
+		return s.Ref
+	case s.RecursiveRef != nil:
+		return s.RecursiveRef
+	case s.DynamicRef != nil && s.DynamicRef.Ref != nil:
+		return s.DynamicRef.Ref
+	}
+	return nil
+}
+
+func carriesOwnKeywords(s *jsonschema.Schema) bool {
+	return len(s.Properties) > 0 || len(s.PatternProperties) > 0 ||
+		s.AdditionalProperties != nil || len(s.AllOf) > 0 ||
+		len(s.AnyOf) > 0 || len(s.OneOf) > 0 || s.Enum != nil ||
+		s.Const != nil || s.Default != nil || s.Types != nil ||
+		len(s.Required) > 0 || s.Description != "" ||
+		len(s.PrefixItems) > 0 || s.Items2020 != nil || s.Items != nil
+}
+
+// mergeSources returns the sub-schemas whose keywords apply alongside s: its
+// $ref target and composition branches. Walking these instead of following a
+// single ref is what merges a $ref with its sibling keywords.
+func mergeSources(s *jsonschema.Schema) []*jsonschema.Schema {
+	out := make([]*jsonschema.Schema, 0, 4)
+	if ref := directRef(s); ref != nil {
+		out = append(out, ref)
+	}
+	out = append(out, s.AllOf...)
+	out = append(out, s.AnyOf...)
+	out = append(out, s.OneOf...)
+	return out
+}
+
 func step(s *jsonschema.Schema, seg string) *jsonschema.Schema {
-	if s == nil {
+	return stepDepth(s, seg, 0)
+}
+
+func stepDepth(s *jsonschema.Schema, seg string, depth int) *jsonschema.Schema {
+	if s == nil || depth > 32 {
 		return nil
 	}
 	if isNumber(seg) {
@@ -69,17 +106,16 @@ func step(s *jsonschema.Schema, seg string) *jsonschema.Schema {
 				return it[idx]
 			}
 		}
-		return nil
-	}
-	if p, ok := s.Properties[seg]; ok {
+	} else if p, ok := s.Properties[seg]; ok {
 		return p
 	}
-	for _, branch := range [][]*jsonschema.Schema{s.AllOf, s.AnyOf, s.OneOf} {
-		for _, b := range branch {
-			if r := step(follow(b), seg); r != nil {
-				return r
-			}
+	for _, src := range mergeSources(s) {
+		if r := stepDepth(src, seg, depth+1); r != nil {
+			return r
 		}
+	}
+	if isNumber(seg) {
+		return nil
 	}
 	// patternProperties before additionalProperties, matching JSON Schema
 	// precedence; common for label/annotation maps and `x-` extension keys.
@@ -144,10 +180,8 @@ func collectEnums(s *jsonschema.Schema, add func(any), depth int) {
 	if s.Const != nil {
 		add(*s.Const)
 	}
-	for _, branch := range [][]*jsonschema.Schema{s.AllOf, s.AnyOf, s.OneOf} {
-		for _, b := range branch {
-			collectEnums(follow(b), add, depth+1)
-		}
+	for _, src := range mergeSources(s) {
+		collectEnums(src, add, depth+1)
 	}
 }
 
@@ -160,13 +194,7 @@ func collectProperties(s *jsonschema.Schema, into map[string]*jsonschema.Schema,
 			into[k] = v
 		}
 	}
-	for _, b := range s.AllOf {
-		collectProperties(follow(b), into, depth+1)
-	}
-	for _, b := range s.AnyOf {
-		collectProperties(follow(b), into, depth+1)
-	}
-	for _, b := range s.OneOf {
-		collectProperties(follow(b), into, depth+1)
+	for _, src := range mergeSources(s) {
+		collectProperties(src, into, depth+1)
 	}
 }
