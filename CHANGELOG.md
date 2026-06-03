@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.12](https://github.com/home-operations/yayamlls/compare/0.0.11...0.0.12) (2026-06-03)
+
+
+### Features
+
+* add gram installation guide ([09337ba](https://github.com/home-operations/yayamlls/commit/09337ba6fd91d05706c6263f9c05da20630f8cff))
+* add kubernetes.enabled toggle for generic YAML mode ([11906e4](https://github.com/home-operations/yayamlls/commit/11906e43a3f44b6a4bbfd2e9ce4cc4e54aa299e5))
+* **mise:** update tool oxfmt (0.52.0 → 0.53.0) ([e1728df](https://github.com/home-operations/yayamlls/commit/e1728df21ebf0ee04a7102309b72a8a0fa0584d8))
+* **mise:** update tool oxfmt (0.52.0 → 0.53.0) ([ab27e22](https://github.com/home-operations/yayamlls/commit/ab27e22eb0a267af7408178805bcbf61dfc570d7))
+
+
+### Bug Fixes
+
+* **mise:** update tool go (1.26.3 → 1.26.4) ([60c667c](https://github.com/home-operations/yayamlls/commit/60c667c7c4d10bf3143f39de1cfa493269d8dad1))
+
 ## [0.0.11](https://github.com/home-operations/yayamlls/compare/0.0.10...0.0.11) (2026-06-01)
 
 
