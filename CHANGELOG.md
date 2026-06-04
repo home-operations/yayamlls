@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.14](https://github.com/home-operations/yayamlls/compare/0.0.13...0.0.14) (2026-06-04)
+
+
+### Bug Fixes
+
+* **flate:** scope builds by name from a Flux entry path and make render debounce configurable ([747bc05](https://github.com/home-operations/yayamlls/commit/747bc053f585c98c2f7225b8480adcd3ef4eae99))
+* make node selection indentation aware ([#34](https://github.com/home-operations/yayamlls/issues/34)) ([cb5a536](https://github.com/home-operations/yayamlls/commit/cb5a5361e9a30b471ad870691f78bf26ad4dadf3))
+* **schema:** merge $ref with sibling keywords ([47ed071](https://github.com/home-operations/yayamlls/commit/47ed071213f5320cbf916bb27d5aff666cc049cb))
+
+
+### Miscellaneous Chores
+
+* move mise to mise folder ([292b8f0](https://github.com/home-operations/yayamlls/commit/292b8f0a5eef079b7ee34ce96d07f142228fa7df))
+* remove duplicate lh file ([2a63adb](https://github.com/home-operations/yayamlls/commit/2a63adb52712e9e3d0d33f71be760d4b2e385c39))
+
 ## [0.0.13](https://github.com/home-operations/yayamlls/compare/0.0.12...0.0.13) (2026-06-03)
 
 
