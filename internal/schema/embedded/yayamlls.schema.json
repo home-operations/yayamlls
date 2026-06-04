@@ -42,17 +42,32 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "enabled": { "type": "boolean", "description": "Whether this renderer is active. Default: true." },
-          "binary": { "type": "string", "description": "flate: override the flate executable name or path." },
-          "path": { "type": "string", "description": "flate: build root; relative paths anchor at the workspace root." },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this renderer is active. Default: true."
+          },
+          "binary": {
+            "type": "string",
+            "description": "flate: override the flate executable name or path."
+          },
+          "path": {
+            "type": "string",
+            "description": "flate: build root; relative paths anchor at the workspace root."
+          },
           "match": {
             "type": "object",
             "description": "Subprocess renderer: which documents this handles.",
             "additionalProperties": false,
             "required": ["kind"],
             "properties": {
-              "kind": { "type": "string", "description": "Kubernetes kind to match, e.g. 'Kustomization'." },
-              "group": { "type": "string", "description": "API group to match on a group boundary, e.g. 'kustomize.toolkit.fluxcd.io'. Omit for the core group." }
+              "kind": {
+                "type": "string",
+                "description": "Kubernetes kind to match, e.g. 'Kustomization'."
+              },
+              "group": {
+                "type": "string",
+                "description": "API group to match on a group boundary, e.g. 'kustomize.toolkit.fluxcd.io'. Omit for the core group."
+              }
             }
           },
           "command": {

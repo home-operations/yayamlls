@@ -1,10 +1,6 @@
 import * as fs from "fs/promises";
 import { commands, ExtensionContext, OutputChannel, window, workspace } from "vscode";
-import {
-  LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 import { ensureBinary } from "./download";
 
 const YAMLLS_REPO = "home-operations/yayamlls";

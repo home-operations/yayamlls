@@ -2,6 +2,7 @@ package yamlast
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml/ast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -45,7 +46,12 @@ func LocateCursor(parsed *Parsed, text string, pos protocol.Position) CursorCont
 	}
 	ctx := CursorContext{Doc: doc}
 
-	v := &cursorVisitor{offset: offset, best: doc.Body}
+	v := &cursorVisitor{
+		offset: offset,
+		line:   int(pos.Line) + 1, // goccy positions are 1-based
+		col:    cursorColumn(text, pos),
+		best:   doc.Body,
+	}
 	ast.Walk(v, doc.Body)
 
 	ctx.Pointer = pathToPointer(v.best.GetPath())
@@ -60,6 +66,8 @@ func LocateCursor(parsed *Parsed, text string, pos protocol.Position) CursorCont
 
 type cursorVisitor struct {
 	offset int
+	line   int // 1-based cursor line, matching goccy token positions
+	col    int // 1-based cursor column (rune count), matching goccy
 	best   ast.Node
 }
 
@@ -67,14 +75,93 @@ func (v *cursorVisitor) Visit(n ast.Node) ast.Visitor {
 	if n == nil {
 		return nil
 	}
-	tok := n.GetToken()
-	if tok == nil || tok.Position == nil {
-		return v
-	}
-	if tok.Position.Offset <= v.offset {
+	if v.encloses(n) {
 		v.best = n
 	}
 	return v
+}
+
+// encloses reports whether the cursor sits structurally within n. YAML
+// structure is indentation-defined, so a purely offset-based test is wrong:
+// on a fresh continuation line the cursor's offset lands past the previous
+// sibling's leaf value, which would attach the cursor to that sibling rather
+// than to the enclosing mapping. We therefore gate on the cursor's column
+// (indentation) as well as its offset.
+func (v *cursorVisitor) encloses(n ast.Node) bool {
+	tok := n.GetToken()
+	if tok == nil || tok.Position == nil {
+		return false
+	}
+	if tok.Position.Offset > v.offset {
+		return false // n begins after the cursor
+	}
+	switch t := n.(type) {
+	case *ast.MappingNode:
+		// Inside the mapping when the cursor is at or deeper than its keys:
+		// a cursor at the key column is a (possibly new) sibling key.
+		return v.col >= mappingEntryColumn(t)
+	case *ast.SequenceNode:
+		// Inside the sequence when the cursor is at or deeper than its dashes.
+		return v.col >= tok.Position.Column
+	case *ast.MappingValueNode:
+		// A mapping entry is the cursor's target only at an inline value
+		// position: on the value's own line, past the key. A cursor on a
+		// later line is either a sibling key (handled by the enclosing
+		// mapping) or inside a block value (handled when its container node
+		// is walked), never this scalar entry itself.
+		return tok.Position.Line == v.line && v.col > keyColumn(t)
+	default:
+		// Scalar (including a null placeholder for an empty value): the cursor
+		// belongs to it only while editing on its own line.
+		return tok.Position.Line == v.line
+	}
+}
+
+// keyColumn reports the indentation column of a mapping entry's key. goccy
+// anchors the MappingValueNode token at the ':' rather than the key, so the
+// column is read from the key node, falling back to the ':' for malformed
+// entries.
+func keyColumn(mv *ast.MappingValueNode) int {
+	if c := tokenColumn(mv.Key); c > 0 {
+		return c
+	}
+	if c := tokenColumn(mv); c > 0 {
+		return c
+	}
+	return 1
+}
+
+// mappingEntryColumn reports the column a mapping's keys sit at, taken from its
+// first entry since goccy anchors the MappingNode token at the first ':'.
+func mappingEntryColumn(m *ast.MappingNode) int {
+	if len(m.Values) > 0 {
+		return keyColumn(m.Values[0])
+	}
+	if c := tokenColumn(m); c > 0 {
+		return c
+	}
+	return 1
+}
+
+func tokenColumn(n ast.Node) int {
+	if n == nil {
+		return 0
+	}
+	if t := n.GetToken(); t != nil && t.Position != nil {
+		return t.Position.Column
+	}
+	return 0
+}
+
+// cursorColumn returns the cursor's 1-based rune column, matching goccy's
+// token columns. Indentation is ASCII whitespace, so a rune count is the
+// right unit for comparing against key/dash columns.
+func cursorColumn(text string, pos protocol.Position) int {
+	lines := strings.Split(text, "\n")
+	if int(pos.Line) >= len(lines) {
+		return 1
+	}
+	return utf8.RuneCountInString(lineUpToUTF16(lines[pos.Line], pos.Character)) + 1
 }
 
 // pathToPointer converts goccy's YAMLPath (e.g. `$.a.'b.c'[0]`) into an RFC

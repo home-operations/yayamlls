@@ -21,25 +21,25 @@ lenses — is on by default. Disable it to run as a generic YAML language server
 
 ```yaml
 kubernetes:
-  enabled: false
+    enabled: false
 ```
 
 ## vs. redhat/yaml-language-server
 
-|                                                | yayamlls                          | redhat/yaml-language-server                                 |
-| ---------------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
-| Runtime                                        | static Go binary                  | Node.js ≥ 12                                                |
-| Diagnostics, completion, hover                 | yes                               | yes                                                         |
-| Symbols, folding, links, code actions          | yes                               | yes                                                         |
-| Code lens                                      | rendered output, diff             | none                                                        |
+|                                                | yayamlls                                       | redhat/yaml-language-server                                 |
+| ---------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| Runtime                                        | static Go binary                               | Node.js ≥ 12                                                |
+| Diagnostics, completion, hover                 | yes                                            | yes                                                         |
+| Symbols, folding, links, code actions          | yes                                            | yes                                                         |
+| Code lens                                      | rendered output, diff                          | none                                                        |
 | Kubernetes auto-detect                         | URL template from apiVersion+kind (toggleable) | `yaml.kubernetesCRDStore` ([datreeio/CRDs-catalog][datree]) |
-| Workspace config file                          | `.yayamlls.yaml`                  | editor settings only                                        |
-| Flux `HelmRelease` / `Kustomization` rendering | via [flate][flate]                | no                                                          |
-| Pluggable renderers (`kustomize`, `helm`, …)   | config-declared subprocess        | no                                                          |
-| Formatting                                     | no                                | yes (Prettier)                                              |
-| Custom YAML tags (`!Ref`, etc.)                | passthrough (skip validation)     | yes                                                         |
-| Diagnostic suppression comments                | yes (`# yayamlls-disable*`)       | yes                                                         |
-| JSON Schema drafts                             | 04, 06, 07, 2019-09, 2020-12      | 04, 07, 2019-09, 2020-12                                    |
+| Workspace config file                          | `.yayamlls.yaml`                               | editor settings only                                        |
+| Flux `HelmRelease` / `Kustomization` rendering | via [flate][flate]                             | no                                                          |
+| Pluggable renderers (`kustomize`, `helm`, …)   | config-declared subprocess                     | no                                                          |
+| Formatting                                     | no                                             | yes (Prettier)                                              |
+| Custom YAML tags (`!Ref`, etc.)                | passthrough (skip validation)                  | yes                                                         |
+| Diagnostic suppression comments                | yes (`# yayamlls-disable*`)                    | yes                                                         |
+| JSON Schema drafts                             | 04, 06, 07, 2019-09, 2020-12                   | 04, 07, 2019-09, 2020-12                                    |
 
 [datree]: https://github.com/datreeio/CRDs-catalog
 
