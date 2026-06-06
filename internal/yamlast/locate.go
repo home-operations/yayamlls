@@ -19,6 +19,10 @@ func unescapePointerSegment(s string) string {
 // ~0 -> ~).
 func UnescapePointerSegment(s string) string { return unescapePointerSegment(s) }
 
+// EscapePointerSegment encodes a single JSON-Pointer segment (~ -> ~0,
+// / -> ~1).
+func EscapePointerSegment(s string) string { return escapePointerSegment(s) }
+
 func StringValueAt(doc *ast.DocumentNode, ptr string) (string, bool) {
 	node, ok := lookup(doc, ptr)
 	if !ok {
@@ -211,7 +215,8 @@ func UTF16Position(src string, line, runeCol int) protocol.Position {
 	if l < 0 {
 		l = 0
 	}
-	return protocol.Position{Line: uint32(l), Character: utf16Column(lineText(src, l), runeCol)}
+	txt, _ := lineText(src, l)
+	return protocol.Position{Line: uint32(l), Character: utf16Column(txt, runeCol)}
 }
 
 func utf16Column(text string, runeCol int) uint32 {
@@ -252,9 +257,13 @@ func utf16RuneLen(r rune) uint32 {
 	return 1
 }
 
-func lineText(src string, line0 int) string {
-	if src == "" || line0 < 0 {
-		return ""
+// LineText returns the given 0-based line of src without its trailing
+// newline; ok is false when src has no such line.
+func LineText(src string, line0 int) (string, bool) { return lineText(src, line0) }
+
+func lineText(src string, line0 int) (string, bool) {
+	if line0 < 0 {
+		return "", false
 	}
 	cur, start := 0, 0
 	for i := 0; i < len(src); i++ {
@@ -262,15 +271,15 @@ func lineText(src string, line0 int) string {
 			continue
 		}
 		if cur == line0 {
-			return src[start:i]
+			return src[start:i], true
 		}
 		cur++
 		start = i + 1
 	}
 	if cur == line0 {
-		return src[start:]
+		return src[start:], true
 	}
-	return ""
+	return "", false
 }
 
 type extentVisitor struct{ start, end *token.Token }

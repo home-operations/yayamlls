@@ -35,7 +35,7 @@ func suppressAction(uri, text string, d protocol.Diagnostic) (protocol.CodeActio
 		return protocol.CodeAction{}, false
 	}
 	line := d.Range.Start.Line
-	src := lineAt(text, line)
+	src, _ := yamlast.LineText(text, int(line))
 	kind := protocol.CodeActionKindQuickFix
 	var edit protocol.TextEdit
 	if canTrail(src) {
@@ -98,15 +98,6 @@ func canTrail(line string) bool {
 		}
 	}
 	return code
-}
-
-// lineAt returns the given 0-based line, or "" when out of range.
-func lineAt(text string, line uint32) string {
-	lines := strings.Split(text, "\n")
-	if int(line) >= len(lines) {
-		return ""
-	}
-	return lines[line]
 }
 
 // leadingWS returns the leading whitespace of a line.

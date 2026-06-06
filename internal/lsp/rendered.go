@@ -3,7 +3,6 @@ package lsp
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/render"
@@ -72,10 +71,8 @@ func flattenRendered(out *render.RenderedOutput, m render.RenderedManifest, verr
 	var walk func(*jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			if opts.FluxSubstitutions && diagnostics.Keyword(e) == "pattern" {
-				if v, ok := yamlast.StringValueAt(m.AST, diagnostics.Pointer(e.InstanceLocation)); ok && strings.Contains(v, "${") {
-					return
-				}
+			if diagnostics.FluxSubstituted(m.AST, e, opts) {
+				return
 			}
 			loc := diagnostics.Pointer(e.InstanceLocation)
 			if loc == "" {

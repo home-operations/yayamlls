@@ -72,13 +72,7 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 	// now stale. Without this an older render can finish after a newer one
 	// and overwrite the current diagnostics with results for old text,
 	// which looks like diagnostics failing to update on edit.
-	if old := p.pending[doc.URI]; old != nil {
-		old.timer.Stop()
-		if old.cancel != nil {
-			old.cancel()
-		}
-		delete(p.pending, doc.URI)
-	}
+	p.cancelPendingLocked(doc.URI)
 	if hit, ok := p.cache[doc.URI]; ok && hit.hash == hash {
 		p.mu.Unlock()
 		p.sink.Notify(doc.URI, hit.out, hit.err)
@@ -121,14 +115,22 @@ func (p *Pipeline) Latest(uri, text string) (*RenderedOutput, bool) {
 func (p *Pipeline) Cancel(uri string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if old := p.pending[uri]; old != nil {
-		old.timer.Stop()
-		if old.cancel != nil {
-			old.cancel()
-		}
-		delete(p.pending, uri)
-	}
+	p.cancelPendingLocked(uri)
 	delete(p.cache, uri)
+}
+
+// cancelPendingLocked stops and drops any pending render for uri. The
+// caller must hold p.mu.
+func (p *Pipeline) cancelPendingLocked(uri string) {
+	old := p.pending[uri]
+	if old == nil {
+		return
+	}
+	old.timer.Stop()
+	if old.cancel != nil {
+		old.cancel()
+	}
+	delete(p.pending, uri)
 }
 
 func contentHash(text string) string {

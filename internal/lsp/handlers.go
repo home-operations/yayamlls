@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	CommandShowRendered     = "yayamlls.showRendered"
-	CommandShowRenderedDiff = "yayamlls.showRenderedDiff"
+	CommandShowRendered     = lens.CommandShowRendered
+	CommandShowRenderedDiff = lens.CommandShowRenderedDiff
 
 	resultKeyYAML = "yaml"
 	resultKeyDiff = "diff"

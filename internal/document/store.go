@@ -3,8 +3,8 @@ package document
 import (
 	"fmt"
 	"sync"
-	"unicode/utf16"
 
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -72,40 +72,12 @@ func (s *Store) Apply(uri string, version int32, changes []any) (*Document, erro
 }
 
 func applyRangeChange(text string, c protocol.TextDocumentContentChangeEvent) string {
-	start := offsetAt(text, c.Range.Start)
-	end := offsetAt(text, c.Range.End)
+	start := yamlast.OffsetAt(text, c.Range.Start)
+	end := yamlast.OffsetAt(text, c.Range.End)
 	if start > end {
 		start, end = end, start
 	}
 	return text[:start] + c.Text + text[end:]
-}
-
-func offsetAt(text string, pos protocol.Position) int {
-	line, col := uint32(0), uint32(0)
-	for i, r := range text {
-		if line == pos.Line {
-			if col >= pos.Character {
-				return i
-			}
-			if r == '\n' {
-				return i // column past end of line: clamp to line end
-			}
-		}
-		if r == '\n' {
-			line++
-			col = 0
-			continue
-		}
-		// LSP character offsets count UTF-16 code units; a rune outside
-		// the BMP occupies two. Counting runes here would misplace edits
-		// in documents containing such characters.
-		n := utf16.RuneLen(r)
-		if n < 0 {
-			n = 1
-		}
-		col += uint32(n)
-	}
-	return len(text)
 }
 
 func (s *Store) AllURIs() []string {

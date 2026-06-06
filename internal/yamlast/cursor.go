@@ -25,7 +25,7 @@ func LocateCursor(parsed *Parsed, text string, pos protocol.Position) CursorCont
 			IsKey:   isKeyLine(text, pos),
 		}
 	}
-	offset := offsetOf(text, pos)
+	offset := OffsetAt(text, pos)
 	doc := parsed.File.Docs[0]
 	for _, d := range parsed.File.Docs {
 		if d.Body == nil {
@@ -217,7 +217,9 @@ func pathToPointer(yp string) string {
 	return b.String()
 }
 
-func offsetOf(text string, pos protocol.Position) int {
+// OffsetAt converts an LSP position (UTF-16 character column) into a byte
+// offset into text, clamping past-end positions to the line or text end.
+func OffsetAt(text string, pos protocol.Position) int {
 	line, col := uint32(0), uint32(0)
 	for i, r := range text {
 		if line == pos.Line {
@@ -241,11 +243,11 @@ func offsetOf(text string, pos protocol.Position) int {
 }
 
 func isKeyLine(text string, pos protocol.Position) bool {
-	lines := strings.Split(text, "\n")
-	if int(pos.Line) >= len(lines) {
+	line, ok := lineText(text, int(pos.Line))
+	if !ok {
 		return false
 	}
-	return !strings.Contains(lineUpToUTF16(lines[pos.Line], pos.Character), ":")
+	return !strings.Contains(lineUpToUTF16(line, pos.Character), ":")
 }
 
 // lineUpToUTF16 returns the prefix of line preceding the given UTF-16

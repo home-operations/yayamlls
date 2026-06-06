@@ -9,9 +9,11 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
+// Commands attached to the lenses; the LSP layer's executeCommand
+// dispatches on them.
 const (
-	commandShowRendered     = "yayamlls.showRendered"
-	commandShowRenderedDiff = "yayamlls.showRenderedDiff"
+	CommandShowRendered     = "yayamlls.showRendered"
+	CommandShowRenderedDiff = "yayamlls.showRenderedDiff"
 )
 
 func Lenses(uri, text string) []protocol.CodeLens {
@@ -38,7 +40,7 @@ func Lenses(uri, text string) []protocol.CodeLens {
 				Range: lensRange,
 				Command: &protocol.Command{
 					Title:     "View rendered",
-					Command:   commandShowRendered,
+					Command:   CommandShowRendered,
 					Arguments: []any{uri},
 				},
 			},
@@ -46,7 +48,7 @@ func Lenses(uri, text string) []protocol.CodeLens {
 				Range: lensRange,
 				Command: &protocol.Command{
 					Title:     "Diff rendered",
-					Command:   commandShowRenderedDiff,
+					Command:   CommandShowRenderedDiff,
 					Arguments: []any{uri},
 				},
 			},

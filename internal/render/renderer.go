@@ -7,9 +7,29 @@ import (
 	"sync"
 
 	yaml "github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/home-operations/yayamlls/internal/yamlast"
 )
+
+// manifestHead is the identifying envelope of a Kubernetes manifest.
+type manifestHead struct {
+	APIVersion string `yaml:"apiVersion"`
+	Kind       string `yaml:"kind"`
+	Metadata   struct {
+		Name string `yaml:"name"`
+	} `yaml:"metadata"`
+}
+
+// decodeHead extracts a document body's manifest envelope. ok is false when
+// the body doesn't decode or carries no kind.
+func decodeHead(body ast.Node) (manifestHead, bool) {
+	var head manifestHead
+	if err := yaml.NodeToValue(body, &head); err != nil || head.Kind == "" {
+		return manifestHead{}, false
+	}
+	return head, true
+}
 
 // ParseManifests splits a renderer's multi-document YAML output into typed
 // manifests, skipping documents with no kind.
@@ -26,17 +46,8 @@ func ParseManifests(stdout []byte) ([]RenderedManifest, error) {
 		if d.Body == nil {
 			continue
 		}
-		var head struct {
-			APIVersion string `yaml:"apiVersion"`
-			Kind       string `yaml:"kind"`
-			Metadata   struct {
-				Name string `yaml:"name"`
-			} `yaml:"metadata"`
-		}
-		if err := yaml.NodeToValue(d.Body, &head); err != nil {
-			continue
-		}
-		if head.Kind == "" {
+		head, ok := decodeHead(d.Body)
+		if !ok {
 			continue
 		}
 		group, version := splitAPIVersion(head.APIVersion)
@@ -177,17 +188,8 @@ func AnalyzeDocument(uri, path, text string) *SourceDocument {
 	if doc.Body == nil {
 		return nil
 	}
-	var head struct {
-		APIVersion string `yaml:"apiVersion"`
-		Kind       string `yaml:"kind"`
-		Metadata   struct {
-			Name string `yaml:"name"`
-		} `yaml:"metadata"`
-	}
-	if err := yaml.NodeToValue(doc.Body, &head); err != nil {
-		return nil
-	}
-	if head.Kind == "" {
+	head, ok := decodeHead(doc.Body)
+	if !ok {
 		return nil
 	}
 	group, version := splitAPIVersion(head.APIVersion)

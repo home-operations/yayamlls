@@ -267,11 +267,16 @@ func (s *Server) cancelRequest(ctx *glsp.Context, params *protocol.CancelParams)
 
 func ptr[T any](v T) *T { return &v }
 
-func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
+// diagnosticOptions derives the validation options from the current
+// effective settings.
+func (s *Server) diagnosticOptions() diagnostics.Options {
 	s.settingsMu.Lock()
-	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(), CustomTags: s.settings.CustomTagNames()}
-	s.settingsMu.Unlock()
-	diags := renderDiagnostics(s.schemas, s.resolver, out, err, opts)
+	defer s.settingsMu.Unlock()
+	return diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(), CustomTags: s.settings.CustomTagNames()}
+}
+
+func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
+	diags := renderDiagnostics(s.schemas, s.resolver, out, err, s.diagnosticOptions())
 
 	s.rendMu.Lock()
 	s.renderedDiags[uri] = diags
@@ -335,9 +340,7 @@ func (s *Server) schedulePublish(d *document.Document) {
 	seq := s.pubSeq[uri]
 	s.pubMu.Unlock()
 
-	s.settingsMu.Lock()
-	opts := diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(), CustomTags: s.settings.CustomTagNames()}
-	s.settingsMu.Unlock()
+	opts := s.diagnosticOptions()
 
 	go func() {
 		// nil marshals to `null`; clients keep stale diagnostics on `null`.

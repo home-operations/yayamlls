@@ -103,10 +103,8 @@ func flattenValidationError(
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			if opts.FluxSubstitutions && keyword(e) == "pattern" {
-				if v, ok := yamlast.StringValueAt(doc, Pointer(e.InstanceLocation)); ok && strings.Contains(v, "${") {
-					return
-				}
+			if FluxSubstituted(doc, e, opts) {
+				return
 			}
 			if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
 				return
@@ -149,6 +147,18 @@ func leafRange(doc *ast.DocumentNode, e *jsonschema.ValidationError, src string)
 		}
 	}
 	return yamlast.LocateRange(doc, loc, src)
+}
+
+// FluxSubstituted reports whether e is a pattern violation on a value
+// containing a Flux substitution placeholder ("${...}"). With
+// Options.FluxSubstitutions set such errors are suppressed, since the
+// pattern can only match after substitution.
+func FluxSubstituted(doc *ast.DocumentNode, e *jsonschema.ValidationError, opts Options) bool {
+	if !opts.FluxSubstitutions || keyword(e) != "pattern" {
+		return false
+	}
+	v, ok := yamlast.StringValueAt(doc, Pointer(e.InstanceLocation))
+	return ok && strings.Contains(v, "${")
 }
 
 // hasCustomTag reports whether the node at ptr carries one of the declared
@@ -197,19 +207,9 @@ func Pointer(loc []string) string {
 	var b strings.Builder
 	for _, seg := range loc {
 		b.WriteByte('/')
-		b.WriteString(escapePointerSegment(seg))
+		b.WriteString(yamlast.EscapePointerSegment(seg))
 	}
 	return b.String()
-}
-
-func escapePointerSegment(s string) string {
-	s = strings.ReplaceAll(s, "~", "~0")
-	return strings.ReplaceAll(s, "/", "~1")
-}
-
-// Keyword returns the JSON Schema keyword that produced the error.
-func Keyword(e *jsonschema.ValidationError) string {
-	return keyword(e)
 }
 
 func keyword(e *jsonschema.ValidationError) string {
