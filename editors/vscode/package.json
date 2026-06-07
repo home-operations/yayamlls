@@ -21,11 +21,11 @@
     "watch": "tsc -watch -p ./"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^10.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.91.0",
     "typescript": "^6.0.0"
   },
   "contributes": {
@@ -103,6 +103,6 @@
     "onLanguage:yaml"
   ],
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.91.0"
   }
 }
