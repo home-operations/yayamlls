@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.0](https://github.com/home-operations/yayamlls/compare/0.0.14...0.1.0) (2026-06-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Update dependency vscode-languageclient (9.0.1 → 10.0.0) ([#33](https://github.com/home-operations/yayamlls/issues/33))
+
+### Features
+
+* **deps:** update dependency @types/node (24.12.4 → 24.13.1) ([#35](https://github.com/home-operations/yayamlls/issues/35)) ([89981c2](https://github.com/home-operations/yayamlls/commit/89981c22a92b797f3f26259bc6f48225e5c315a1))
+* **deps:** Update dependency vscode-languageclient (9.0.1 → 10.0.0) ([#33](https://github.com/home-operations/yayamlls/issues/33)) ([07d8cb3](https://github.com/home-operations/yayamlls/commit/07d8cb301a9664eb23723ac6cb5d8293f4390111))
+* embed flate as a library instead of shelling out to its binary ([6577e9c](https://github.com/home-operations/yayamlls/commit/6577e9c1a16513ae5d9f5631d57653ef0b091836))
+
+
+### Miscellaneous Chores
+
+* **deps:** lock file maintenance ([#36](https://github.com/home-operations/yayamlls/issues/36)) ([411fdab](https://github.com/home-operations/yayamlls/commit/411fdab60224bbf083196eb75d75a15c789cfcb2))
+* Update release-please-config.json exclusions ([9d76d26](https://github.com/home-operations/yayamlls/commit/9d76d26365a44dd0250cdf4a56f25d2ec88da322))
+* update rlspls workflow name ([b0d2242](https://github.com/home-operations/yayamlls/commit/b0d22422afd848dde72a05a3055a0b81684e8857))
+
+
+### Code Refactoring
+
+* consolidate duplicated helpers and expand test coverage ([35116b7](https://github.com/home-operations/yayamlls/commit/35116b7bf82d1b380fa1e0d71aff16d7890399a3))
+
 ## [0.0.14](https://github.com/home-operations/yayamlls/compare/0.0.13...0.0.14) (2026-06-04)
 
 
