@@ -4,13 +4,12 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-lan
 import { ensureBinary } from "./download";
 
 const YAMLLS_REPO = "home-operations/yayamlls";
-const FLATE_REPO = "home-operations/flate";
 
 let client: LanguageClient | undefined;
 let output: OutputChannel;
 
 /** Build the server's initializationOptions from `yayamlls.*` settings. */
-function initializationOptions(flatePath: string | undefined) {
+function initializationOptions() {
   const cfg = workspace.getConfiguration("yayamlls");
   const opts: Record<string, unknown> = {
     catalog: cfg.get<boolean>("catalog", true),
@@ -24,37 +23,10 @@ function initializationOptions(flatePath: string | undefined) {
   if (schemaUrl) {
     opts.kubernetes = { schemaUrl };
   }
-  if (flatePath) {
-    opts.renderers = { flate: { enabled: true, binary: flatePath } };
-  } else if (!cfg.get<boolean>("flate.enabled", true)) {
+  if (!cfg.get<boolean>("flate.enabled", true)) {
     opts.renderers = { flate: { enabled: false } };
   }
   return opts;
-}
-
-/** Resolve the flate binary for Flux rendering, downloading it if enabled. */
-async function resolveFlate(storageDir: string): Promise<string | undefined> {
-  const cfg = workspace.getConfiguration("yayamlls");
-  if (!cfg.get<boolean>("flate.enabled", true)) {
-    return undefined;
-  }
-  const override = cfg.get<string>("flate.path", "").trim();
-  if (override) {
-    return override;
-  }
-  try {
-    return await ensureBinary(
-      storageDir,
-      FLATE_REPO,
-      "flate",
-      cfg.get<string>("flate.version", "latest"),
-      output,
-    );
-  } catch (err) {
-    // Rendering is optional; degrade gracefully if flate can't be fetched.
-    output.appendLine(`yayamlls: flate unavailable, rendering disabled (${err})`);
-    return undefined;
-  }
 }
 
 async function resolveCommand(storageDir: string): Promise<string> {
@@ -77,7 +49,6 @@ async function startClient(context: ExtensionContext): Promise<void> {
   await fs.mkdir(storageDir, { recursive: true });
 
   const command = await resolveCommand(storageDir);
-  const flatePath = await resolveFlate(storageDir);
   // No transport: stdio is the default. Setting it makes the client append a
   // `--stdio` arg the server's flag parser rejects.
   const serverOptions: ServerOptions = {
@@ -85,7 +56,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
   };
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "yaml" }],
-    initializationOptions: initializationOptions(flatePath),
+    initializationOptions: initializationOptions(),
     synchronize: { configurationSection: "yayamlls" },
     outputChannel: output,
   };

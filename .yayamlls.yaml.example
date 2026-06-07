@@ -24,7 +24,6 @@ catalog: true
 # renderers:
 #   flate:
 #     enabled: true
-#     binary: flate
 #     # Scan from this path instead of the edited file's directory, so a
 #     # HelmRelease can resolve a source defined elsewhere. Relative to repo root.
 #     path: kubernetes

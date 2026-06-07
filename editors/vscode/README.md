@@ -39,7 +39,7 @@ precedence than these editor settings.
 ## Commands
 
 - **yayamlls: Show Rendered Output**: render the active Flux `HelmRelease` /
-  `Kustomization` (requires [`flate`](https://github.com/home-operations/flate)).
+  `Kustomization` with the embedded [`flate`](https://github.com/home-operations/flate).
 - **yayamlls: Restart Language Server**
 
 ## Notes

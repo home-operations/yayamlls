@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -17,7 +16,7 @@ import (
 )
 
 // Run with -race: Render (pipeline goroutine) and Configure (LSP request
-// goroutine) touch the same resolution state and must not race.
+// goroutine) touch the same config state and must not race.
 func TestRenderer_ConfigureDuringRenderNoRace(t *testing.T) {
 	r := flate.New()
 	doc := &render.SourceDocument{
@@ -47,7 +46,7 @@ func TestRenderer_ConfigureDuringRenderNoRace(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				_ = r.Configure(json.RawMessage(fmt.Sprintf(`{"binary":"flate-missing-%d"}`, i%2)))
+				_ = r.Configure(json.RawMessage(fmt.Sprintf(`{"path":"/repo-%d"}`, i%2)))
 			}
 		}
 	}()
@@ -56,176 +55,176 @@ func TestRenderer_ConfigureDuringRenderNoRace(t *testing.T) {
 	wg.Wait()
 }
 
-func writeStub(t *testing.T, body string) string {
+// writeFixture writes a minimal Flux GitOps tree:
+//
+//   - kubernetes/flux/cluster.yaml — Kustomizations apps-a and apps-b
+//   - kubernetes/apps-{a,b}/        — one ConfigMap each
+//
+// Bootstrap publishes a synthetic GitRepository for the local tree, so the
+// sourceRef resolves offline. Returns the kubernetes/ path to build from.
+func writeFixture(t *testing.T) string {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("stub script uses /bin/sh")
+	// Keep flate's on-disk caches out of the real user cache dir.
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	k8s := filepath.Join(root, "kubernetes")
+	for _, name := range []string{"apps-a", "apps-b"} {
+		writeFile(t, filepath.Join(k8s, "flux", name+".yaml"), `---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: `+name+`
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./`+name+`
+  sourceRef: {kind: GitRepository, name: flux-system, namespace: flux-system}
+`)
+		writeFile(t, filepath.Join(k8s, name, "kustomization.yaml"),
+			"resources:\n- cm.yaml\n")
+		writeFile(t, filepath.Join(k8s, name, "cm.yaml"), `---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: cm-`+name+`, namespace: default}
+data:
+  greeting: hi
+`)
 	}
-	dir := t.TempDir()
-	path := filepath.Join(dir, "flate")
-	script := "#!/bin/sh\ncat <<'YAML_EOF'\n" + body + "\nYAML_EOF\n"
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return k8s
 }
 
-// writeArgStub is writeStub plus a recording of the argv to argsPath.
-func writeArgStub(t *testing.T, body string) (binPath, argsPath string) {
+func writeFile(t *testing.T, path, body string) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("stub script uses /bin/sh")
-	}
-	dir := t.TempDir()
-	binPath = filepath.Join(dir, "flate")
-	argsPath = filepath.Join(dir, "args")
-	script := "#!/bin/sh\necho \"$@\" > " + argsPath + "\ncat <<'YAML_EOF'\n" + body + "\nYAML_EOF\n"
-	if err := os.WriteFile(binPath, []byte(script), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return binPath, argsPath
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
-func TestFlate_BuildPath_ScopesByName(t *testing.T) {
-	bin, argsPath := writeArgStub(t, "apiVersion: v1\nkind: Pod\nmetadata:\n  name: foo")
-	r := &flate.Renderer{Binary: bin}
-	if err := r.Configure(json.RawMessage(`{"path":"/repo/kubernetes"}`)); err != nil {
+func ksDoc(name string) *render.SourceDocument {
+	return &render.SourceDocument{
+		Kind:     "Kustomization",
+		APIGroup: "kustomize.toolkit.fluxcd.io/v1",
+		Name:     name,
+	}
+}
+
+func TestFlate_RenderKustomization_ScopesByName(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	src := &render.SourceDocument{
-		Path:     "/repo/kubernetes/apps/home-infra/frigate/app/hr.yaml",
-		Kind:     "HelmRelease",
-		APIGroup: "helm.toolkit.fluxcd.io/v2",
-		Name:     "frigate",
-	}
-	if _, err := r.Render(context.Background(), src); err != nil {
+	out, err := r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	got := readArgs(t, argsPath)
-	want := "build hr frigate --path /repo/kubernetes -o yaml"
-	if got != want {
-		t.Errorf("argv = %q, want %q", got, want)
+	if len(out.Manifests) != 1 {
+		t.Fatalf("expected 1 manifest, got %d (raw: %s)", len(out.Manifests), out.Raw)
+	}
+	m := out.Manifests[0]
+	if m.GVK.Kind != "ConfigMap" || m.Name != "cm-apps-a" {
+		t.Errorf("manifest = %s/%s, want ConfigMap/cm-apps-a", m.GVK.Kind, m.Name)
+	}
+	if strings.Contains(string(out.Raw), "cm-apps-b") {
+		t.Errorf("output not scoped to apps-a: %s", out.Raw)
 	}
 }
 
-func TestFlate_BuildPath_RelativeAnchoredAtWorkspaceRoot(t *testing.T) {
-	bin, argsPath := writeArgStub(t, "apiVersion: v1\nkind: Pod\nmetadata:\n  name: foo")
-	r := &flate.Renderer{Binary: bin}
+func TestFlate_RelativePathAnchoredAtWorkspaceRoot(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
 	if err := r.Configure(json.RawMessage(`{"path":"kubernetes"}`)); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	r.SetWorkspaceRoot("/repo")
-	src := &render.SourceDocument{
-		Path:     "/repo/kubernetes/apps/home-infra/frigate/app/hr.yaml",
-		Kind:     "HelmRelease",
-		APIGroup: "helm.toolkit.fluxcd.io/v2",
-		Name:     "frigate",
-	}
-	if _, err := r.Render(context.Background(), src); err != nil {
+	r.SetWorkspaceRoot(filepath.Dir(k8s))
+	out, err := r.Render(context.Background(), ksDoc("apps-b"))
+	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	got := readArgs(t, argsPath)
-	want := "build hr frigate --path " + filepath.Join("/repo", "kubernetes") + " -o yaml"
-	if got != want {
-		t.Errorf("argv = %q, want %q", got, want)
+	if len(out.Manifests) != 1 || out.Manifests[0].Name != "cm-apps-b" {
+		t.Fatalf("expected cm-apps-b, got %+v", out.Manifests)
 	}
 }
 
-func TestFlate_BuildPath_SkipsWhenNameUnknown(t *testing.T) {
-	bin, argsPath := writeArgStub(t, "apiVersion: v1\nkind: Pod\nmetadata:\n  name: foo")
-	r := &flate.Renderer{Binary: bin}
-	if err := r.Configure(json.RawMessage(`{"path":"/repo/kubernetes"}`)); err != nil {
+func TestFlate_SkipsWhenNameUnknown(t *testing.T) {
+	r := flate.New()
+	r.SetWorkspaceRoot("/nonexistent") // must not be touched when skipping
+	out, err := r.Render(context.Background(), ksDoc(""))
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if len(out.Manifests) != 0 || len(out.Raw) != 0 {
+		t.Errorf("expected empty output when name is unknown, got %+v", out)
+	}
+}
+
+func TestFlate_UnmatchedNameErrors(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	src := &render.SourceDocument{
-		Path:     "/repo/kubernetes/apps/home-infra/frigate/app/hr.yaml",
-		Kind:     "HelmRelease",
-		APIGroup: "helm.toolkit.fluxcd.io/v2",
-	}
-	out, err := r.Render(context.Background(), src)
-	if err != nil {
-		t.Fatalf("render: %v", err)
-	}
-	if len(out.Manifests) != 0 {
-		t.Errorf("expected no manifests when name is unknown, got %d", len(out.Manifests))
-	}
-	if _, err := os.Stat(argsPath); !os.IsNotExist(err) {
-		t.Errorf("flate should not have been invoked; stat err = %v", err)
+	_, err := r.Render(context.Background(), ksDoc("no-such-ks"))
+	if err == nil || !strings.Contains(err.Error(), `no Kustomization named "no-such-ks"`) {
+		t.Fatalf("expected unmatched-name error, got %v", err)
 	}
 }
 
-func readArgs(t *testing.T, path string) string {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read args: %v", err)
+// One tree render serves multiple documents; editing the tree invalidates it.
+func TestFlate_TreeCacheInvalidatedOnFileChange(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
+		t.Fatalf("configure: %v", err)
 	}
-	return strings.TrimSpace(string(b))
-}
-
-func TestFlate_RenderHelmRelease(t *testing.T) {
-	rendered := `apiVersion: v1
-kind: Pod
-metadata:
-  name: foo
-spec:
-  containers:
-    - name: c
-      image: nginx:latest
----
+	out, err := r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("first render: %v", err)
+	}
+	if !strings.Contains(string(out.Raw), "greeting: hi") {
+		t.Fatalf("unexpected first render: %s", out.Raw)
+	}
+	// Second doc against the same tree comes from the cached render.
+	if _, err := r.Render(context.Background(), ksDoc("apps-b")); err != nil {
+		t.Fatalf("second doc render: %v", err)
+	}
+	writeFile(t, filepath.Join(k8s, "apps-a", "cm.yaml"), `---
 apiVersion: v1
-kind: Service
-metadata:
-  name: bar
-spec:
-  ports:
-    - port: 80`
-	stub := writeStub(t, rendered)
-
-	r := &flate.Renderer{Binary: stub}
-	r.SetWorkspaceRoot("/repo")
-	src := &render.SourceDocument{
-		URI:      "file:///repo/hr.yaml",
-		Path:     "/repo/hr.yaml",
-		Kind:     "HelmRelease",
-		APIGroup: "helm.toolkit.fluxcd.io/v2beta2",
-		Name:     "foo",
-	}
-
-	out, err := r.Render(context.Background(), src)
+kind: ConfigMap
+metadata: {name: cm-apps-a, namespace: default}
+data:
+  greeting: hello again
+`)
+	out, err = r.Render(context.Background(), ksDoc("apps-a"))
 	if err != nil {
-		t.Fatalf("render: %v", err)
+		t.Fatalf("render after edit: %v", err)
 	}
-	if len(out.Manifests) != 2 {
-		t.Fatalf("expected 2 manifests, got %d", len(out.Manifests))
-	}
-	gotKinds := []string{out.Manifests[0].GVK.Kind, out.Manifests[1].GVK.Kind}
-	wantKinds := []string{"Pod", "Service"}
-	for i := range wantKinds {
-		if gotKinds[i] != wantKinds[i] {
-			t.Errorf("manifests[%d].GVK.Kind = %s, want %s", i, gotKinds[i], wantKinds[i])
-		}
-	}
-	if !strings.Contains(string(out.Raw), "Service") {
-		t.Errorf("Raw missing Service doc: %s", out.Raw)
+	if !strings.Contains(string(out.Raw), "hello again") {
+		t.Errorf("edit not picked up, raw: %s", out.Raw)
 	}
 }
 
-func TestFlate_MissingBinaryGivesActionableError(t *testing.T) {
-	r := &flate.Renderer{Binary: "/no/such/path/flate-does-not-exist"}
-	r.SetWorkspaceRoot("/repo")
-	src := &render.SourceDocument{
-		Path:     "/repo/hr.yaml",
-		Kind:     "HelmRelease",
-		APIGroup: "helm.toolkit.fluxcd.io/v2",
-		Name:     "frigate",
+// A cancelled render must not be cached: the next caller gets a fresh one.
+func TestFlate_CancelledRenderNotCached(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
+		t.Fatalf("configure: %v", err)
 	}
-	_, err := r.Render(context.Background(), src)
-	if err == nil {
-		t.Fatal("expected an error, got nil")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := r.Render(ctx, ksDoc("apps-a")); err == nil {
+		t.Fatal("expected error from cancelled render")
 	}
-	if !strings.Contains(err.Error(), "install with `go install") {
-		t.Errorf("error message not actionable: %v", err)
+	out, err := r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("render after cancellation: %v", err)
+	}
+	if len(out.Manifests) != 1 || out.Manifests[0].Name != "cm-apps-a" {
+		t.Fatalf("expected cm-apps-a after retry, got %+v", out.Manifests)
 	}
 }
 
@@ -246,4 +245,10 @@ func TestFlate_MatchesKindsExactly(t *testing.T) {
 			t.Errorf("%s: Matches = %v, want %v", c.name, got, c.want)
 		}
 	}
+}
+
+// jsonQuote JSON-quotes a path for embedding in a config literal.
+func jsonQuote(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }

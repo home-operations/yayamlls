@@ -60,11 +60,7 @@ go install github.com/home-operations/yayamlls/cmd/yayamlls@latest
 Prebuilt binaries for linux/darwin/windows (amd64+arm64) are attached to
 each [GitHub release](https://github.com/home-operations/yayamlls/releases).
 
-For Flux rendering:
-
-```sh
-go install github.com/home-operations/flate/cmd/flate@latest
-```
+Flux rendering is built in via [flate][flate]; no separate install is needed.
 
 ## Editor setup
 
@@ -72,7 +68,7 @@ go install github.com/home-operations/flate/cmd/flate@latest
 an absolute path.
 
 Packaged extensions for **VS Code** and **Zed** live in [`editors/`](editors);
-they download the matching `yayamlls` (and `flate`) release binary automatically.
+they download the matching `yayamlls` release binary automatically.
 The snippets below are for editors with built-in LSP support.
 
 ### Neovim
@@ -94,8 +90,7 @@ With no marker found the server still attaches in single-file mode.
 ### VSCode
 
 Use the extension in [`editors/vscode`](editors/vscode); it downloads the
-`yayamlls` binary (and `flate` for Flux rendering) on first activation, and
-exposes `yayamlls.*` settings. To build and run it locally, press <kbd>F5</kbd>
+`yayamlls` binary on first activation, and exposes `yayamlls.*` settings. To build and run it locally, press <kbd>F5</kbd>
 from that directory; to package a `.vsix`, run `vsce package`. See its
 [README](editors/vscode/README.md) for settings and publishing.
 
@@ -166,8 +161,8 @@ the repo and reads `extension.toml` from its root, so it can't reach the
 
 ### Flux rendering
 
-With [flate][flate] installed, opening a `HelmRelease` or
-`Kustomization` surfaces schema violations on rendered manifests as
+Opening a `HelmRelease` or `Kustomization` surfaces schema violations on the
+[flate][flate]-rendered manifests as
 `[rendered <kind>/<name> @ <jsonptr>]` on the source document. A code lens
 on the resource offers **View rendered** and **Diff rendered**; running it
 opens the result in the editor via a `window/showDocument` request, so no
@@ -215,7 +210,6 @@ catalogUrl: ""
 # renderers:
 #   flate:
 #     enabled: true
-#     binary: flate
 #     # Narrow the Flux entry flate builds from (defaults to the workspace
 #     # root), so a HelmRelease resolves a source defined elsewhere. Output is
 #     # scoped to the edited resource by metadata.name. Relative to workspace root.
@@ -255,7 +249,7 @@ document's directory), `{file}` (its path), `{name}` (`metadata.name`). The
 command runs with its working directory set to the document's directory.
 A config-declared renderer takes precedence over a built-in one matching the
 same kind, and a missing command binary is treated as "renderer unavailable"
-(silent), just like a missing `flate`.
+(silent).
 
 See [`.yayamlls.yaml.example`](.yayamlls.yaml.example) for a copyable starter.
 

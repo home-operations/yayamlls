@@ -8,19 +8,16 @@ import (
 	"github.com/home-operations/yayamlls/internal/render/flate"
 )
 
-func TestFlate_Configure_DisablesAndChangesBinary(t *testing.T) {
+func TestFlate_Configure_Disables(t *testing.T) {
 	r := flate.New()
 	if !r.IsEnabled() {
 		t.Fatalf("default should be enabled")
 	}
-	if err := r.Configure(json.RawMessage(`{"enabled": false, "binary": "/opt/flate"}`)); err != nil {
+	if err := r.Configure(json.RawMessage(`{"enabled": false}`)); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
 	if r.IsEnabled() {
 		t.Errorf("expected disabled after configure")
-	}
-	if r.Binary != "/opt/flate" {
-		t.Errorf("binary not updated: %q", r.Binary)
 	}
 }
 

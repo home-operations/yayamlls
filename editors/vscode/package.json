@@ -84,17 +84,7 @@
         "yayamlls.flate.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Download [`flate`](https://github.com/home-operations/flate) and enable Flux `HelmRelease` / `Kustomization` rendering."
-        },
-        "yayamlls.flate.path": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Absolute path to a `flate` binary. When set, skips the download."
-        },
-        "yayamlls.flate.version": {
-          "type": "string",
-          "default": "latest",
-          "description": "flate release tag to download (e.g. \"0.1.32\"), or \"latest\"."
+          "markdownDescription": "Enable Flux `HelmRelease` / `Kustomization` rendering via the embedded [`flate`](https://github.com/home-operations/flate)."
         },
         "yayamlls.trace.server": {
           "type": "string",
