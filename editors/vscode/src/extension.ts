@@ -1,12 +1,12 @@
 import * as fs from "fs/promises";
-import { commands, ExtensionContext, OutputChannel, window, workspace } from "vscode";
+import { commands, ExtensionContext, LogOutputChannel, window, workspace } from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 import { ensureBinary } from "./download";
 
 const YAMLLS_REPO = "home-operations/yayamlls";
 
 let client: LanguageClient | undefined;
-let output: OutputChannel;
+let output: LogOutputChannel;
 
 /** Build the server's initializationOptions from `yayamlls.*` settings. */
 function initializationOptions() {
@@ -65,7 +65,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
 }
 
 export async function activate(context: ExtensionContext): Promise<void> {
-  output = window.createOutputChannel("yayamlls");
+  output = window.createOutputChannel("yayamlls", { log: true });
   context.subscriptions.push(output);
 
   // showRendered/showRenderedDiff are auto-registered from the server's
