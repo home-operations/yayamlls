@@ -159,6 +159,49 @@ the repo and reads `extension.toml` from its root, so it can't reach the
 
 [gram-install]: https://gram-editor.com/docs/extensions/installing-extensions/
 
+### Claude Code
+
+`yayamlls` ships as a [Claude Code](https://claude.com/claude-code) plugin in
+[`editors/claude`](editors/claude): it registers the language server over LSP
+(live diagnostics, hover, completion), adds a hook that runs `yayamlls validate`
+after each YAML edit and feeds the results back, and bundles a skill. This repo
+is itself a plugin marketplace:
+
+```
+/plugin marketplace add home-operations/yayamlls
+/plugin install yayamlls@yayamlls
+```
+
+The plugin doesn't bundle the binary — install it first (`brew install
+home-operations/tap/yayamlls`, `go install`, or a release) so `yayamlls` is on
+`$PATH`; the hook also needs `jq`. Full guide: [`editors/claude/README.md`](editors/claude/README.md).
+
+### OpenCode
+
+[OpenCode](https://opencode.ai) registers custom language servers through the
+`lsp` key in `opencode.json` (project root or `~/.config/opencode/`). OpenCode
+ships a built-in YAML server (Red Hat's `yaml-language-server`, keyed `yaml-ls`),
+so disable it alongside the `yayamlls` entry to avoid duplicate diagnostics. Put
+the binary on `$PATH`, then:
+
+```jsonc
+// opencode.json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "lsp": {
+        "yaml-ls": { "disabled": true },
+        "yayamlls": {
+            "command": ["yayamlls"],
+            "extensions": [".yaml", ".yml"]
+        }
+    }
+}
+```
+
+Each `lsp` entry also accepts `env` and `initialization` (the server reads
+`kubernetes`, `catalog`, `catalogUrl`, `schemas`, `renderers`). Prefer a
+workspace `.yayamlls.yaml` for those so the config stays editor-agnostic.
+
 ### Flux rendering
 
 Opening a `HelmRelease` or `Kustomization` surfaces schema violations on the

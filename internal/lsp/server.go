@@ -132,6 +132,14 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	caps.CodeActionProvider = &protocol.CodeActionOptions{
 		CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 	}
+	// glsp wires the WorkspaceDidChangeWorkspaceFolders handler but doesn't set
+	// this capability, and clients withhold the notification until it's declared.
+	caps.Workspace = &protocol.ServerCapabilitiesWorkspace{
+		WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{
+			Supported:           ptr(true),
+			ChangeNotifications: &protocol.BoolOrString{Value: true},
+		},
+	}
 
 	if w := params.Capabilities.Window; w != nil && w.ShowDocument != nil && w.ShowDocument.Support {
 		s.clientShowDoc = true

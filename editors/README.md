@@ -18,6 +18,12 @@ yayamlls_{version}_{os}_{arch}.zip      # windows
 | VS Code | TypeScript (`vscode-languageclient`) | [`vscode/`](./vscode) | downloaded to global storage; override with `yayamlls.path`       |
 | Zed     | Rust → WASM (`zed_extension_api`)    | [`zed/`](./zed)       | downloaded to the extension work dir; override with `binary.path` |
 
+**Claude Code** consumes `yayamlls` as a plugin (LSP + validate-on-edit hook +
+skill) rather than an editor extension; the binary must already be on `$PATH`.
+See [`claude/`](./claude) and the top-level [README](../README.md#claude-code).
+**OpenCode** uses its own `opencode.json` `lsp` config — see the top-level
+[README](../README.md#opencode).
+
 **Gram** is a Zed fork that installs Zed extensions, so point it at [`zed/`](./zed)
 via **Install Local**; it compiles to WASM locally and needs a WASM-capable Rust
 toolchain (`wasm32-wasip2`, vs. Zed's `wasm32-wasip1`). See the top-level
