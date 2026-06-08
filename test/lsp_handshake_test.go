@@ -148,6 +148,11 @@ func TestInitializeHandshake(t *testing.T) {
 	if _, ok := caps["textDocumentSync"]; !ok {
 		t.Errorf("textDocumentSync capability not advertised; caps=%v", caps)
 	}
+	wsFolders, _ := caps["workspace"].(map[string]any)
+	folders, _ := wsFolders["workspaceFolders"].(map[string]any)
+	if folders["supported"] != true {
+		t.Errorf("workspace folder support not advertised; caps=%v", caps)
+	}
 	info, ok := result["serverInfo"].(map[string]any)
 	if !ok || info["name"] != "yayamlls" {
 		t.Errorf("serverInfo missing or wrong: %v", result["serverInfo"])
