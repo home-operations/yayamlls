@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yayamlls",
+  "displayName": "yayamlls",
+  "description": "Schema-driven YAML diagnostics, completion, hover, and Flux rendering via the yayamlls language server.",
+  "version": "0.1.0",
+  "author": {
+    "name": "home-operations",
+    "url": "https://github.com/home-operations/yayamlls"
+  },
+  "homepage": "https://github.com/home-operations/yayamlls",
+  "repository": "https://github.com/home-operations/yayamlls",
+  "license": "AGPL-3.0",
+  "keywords": ["yaml", "lsp", "kubernetes", "flux", "json-schema"]
+}

@@ -1,0 +1,9 @@
+{
+  "yayamlls": {
+    "command": "yayamlls",
+    "extensionToLanguage": {
+      ".yaml": "yaml",
+      ".yml": "yaml"
+    }
+  }
+}
