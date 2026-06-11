@@ -91,6 +91,11 @@
       "type": "integer",
       "minimum": 1,
       "description": "Debounce, in milliseconds, before a document change triggers a renderer (e.g. flate). Unset or non-positive uses the built-in default of 750."
+    },
+    "renderTimeoutMs": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum time, in milliseconds, a single render may run before its deadline trips. Unset or non-positive uses the built-in default of 30000."
     }
   }
 }

@@ -135,6 +135,9 @@ func Merge(base, override Settings) Settings {
 	if override.RenderDebounceMs != nil {
 		out.RenderDebounceMs = override.RenderDebounceMs
 	}
+	if override.RenderTimeoutMs != nil {
+		out.RenderTimeoutMs = override.RenderTimeoutMs
+	}
 	if override.CustomTags != nil {
 		out.CustomTags = unionStrings(out.CustomTags, override.CustomTags)
 	}

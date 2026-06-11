@@ -267,6 +267,11 @@ catalogUrl: ""
 # Default: 750.
 # renderDebounceMs: 750
 
+# Optional. Max time (ms) a single render may run before its deadline trips.
+# Raise it if a slow source fetch (git/OCI) trips "context deadline exceeded".
+# Default: 30000.
+# renderTimeoutMs: 30000
+
 # Optional. YAML tags resolved by an external tool (Flux, CloudFormation,
 # Vault, …). Nodes carrying one skip schema validation, since the value
 # present in the file is a placeholder, not the resolved value.

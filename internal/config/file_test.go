@@ -146,3 +146,18 @@ func TestMerge_CarriesRenderDebounce(t *testing.T) {
 		t.Errorf("base renderDebounceMs cleared by empty override: %+v", keep.RenderDebounceMs)
 	}
 }
+
+func TestMerge_CarriesRenderTimeout(t *testing.T) {
+	ms := 60000
+	base := Settings{}
+	override := Settings{RenderTimeoutMs: &ms}
+	got := Merge(base, override)
+	if got.RenderTimeoutMs == nil || *got.RenderTimeoutMs != 60000 {
+		t.Errorf("override renderTimeoutMs dropped: %+v", got.RenderTimeoutMs)
+	}
+	// An override that omits the field must not clear a base value.
+	keep := Merge(Settings{RenderTimeoutMs: &ms}, Settings{})
+	if keep.RenderTimeoutMs == nil || *keep.RenderTimeoutMs != 60000 {
+		t.Errorf("base renderTimeoutMs cleared by empty override: %+v", keep.RenderTimeoutMs)
+	}
+}

@@ -11,10 +11,16 @@ import (
 // DefaultDebounce is the render debounce applied when none is configured.
 const DefaultDebounce = 750 * time.Millisecond
 
+// DefaultTimeout bounds a single render when none is configured. A render is
+// near-instant in steady state; the deadline only guards against a source
+// fetch (git/OCI) stalling on a slow or unreachable remote.
+const DefaultTimeout = 30 * time.Second
+
 type Pipeline struct {
 	registry *Registry
 	sink     Sink
 	debounce time.Duration
+	timeout  time.Duration
 
 	mu      sync.Mutex
 	pending map[string]*pending
@@ -46,6 +52,7 @@ func NewPipeline(reg *Registry, sink Sink) *Pipeline {
 		registry: reg,
 		sink:     sink,
 		debounce: DefaultDebounce,
+		timeout:  DefaultTimeout,
 		pending:  make(map[string]*pending),
 		cache:    make(map[string]cacheEntry),
 	}
@@ -55,6 +62,12 @@ func (p *Pipeline) SetDebounce(d time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.debounce = d
+}
+
+func (p *Pipeline) SetTimeout(d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.timeout = d
 }
 
 func (p *Pipeline) Schedule(doc *SourceDocument) {
@@ -78,7 +91,7 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 		p.sink.Notify(doc.URI, hit.out, hit.err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
 	var self *pending
 	t := time.AfterFunc(p.debounce, func() {
 		defer cancel()

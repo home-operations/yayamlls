@@ -223,6 +223,11 @@ func (s *Server) applyLayers() {
 		debounce = time.Duration(*ms) * time.Millisecond
 	}
 	s.pipeline.SetDebounce(debounce)
+	timeout := render.DefaultTimeout
+	if ms := effective.RenderTimeoutMs; ms != nil && *ms > 0 {
+		timeout = time.Duration(*ms) * time.Millisecond
+	}
+	s.pipeline.SetTimeout(timeout)
 }
 
 // setWorkspaceLayer replaces the .yayamlls.yaml layer (e.g. after a

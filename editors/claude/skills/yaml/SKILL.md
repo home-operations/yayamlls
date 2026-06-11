@@ -53,6 +53,7 @@ schemas:                    # schema URL/path -> the file globs it applies to
 fluxSubstitutions: true     # treat ${VAR} Flux postBuild substitutions as valid
 customTags: ["!secret"]     # extra YAML tags to accept without error
 renderDebounceMs: 200       # debounce for the Flux render pipeline
+renderTimeoutMs: 30000      # max time a single render may run (deadline)
 ```
 
 See `.yayamlls.yaml.example` in the repo root for the full set.

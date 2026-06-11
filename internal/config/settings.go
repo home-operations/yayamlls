@@ -13,6 +13,10 @@ type Settings struct {
 	// change triggers a renderer (e.g. flate). Unset or non-positive uses the
 	// built-in default.
 	RenderDebounceMs *int `json:"renderDebounceMs,omitempty"`
+	// RenderTimeoutMs caps how long a single render may run, in milliseconds,
+	// before its context deadline trips. Unset or non-positive uses the
+	// built-in default.
+	RenderTimeoutMs *int `json:"renderTimeoutMs,omitempty"`
 	// CustomTags lists YAML tags (e.g. "!Ref", "!vault scalar") whose values
 	// an external tool resolves; nodes carrying them skip schema validation.
 	CustomTags []string `json:"customTags,omitempty"`

@@ -2,6 +2,7 @@ package render_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -136,6 +137,40 @@ func TestPipeline_SupersededRenderIsDropped(t *testing.T) {
 	}
 	if string(sink.got[0].Raw) != "new" {
 		t.Errorf("delivered stale content %q, want %q", sink.got[0].Raw, "new")
+	}
+}
+
+// ctxRenderer blocks until its render context is cancelled, then returns the
+// context error — standing in for a source fetch that stalls on a slow remote.
+type ctxRenderer struct{}
+
+func (ctxRenderer) Name() string                        { return "ctx" }
+func (ctxRenderer) Matches(*render.SourceDocument) bool { return true }
+func (ctxRenderer) Render(ctx context.Context, _ *render.SourceDocument) (*render.RenderedOutput, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestPipeline_SetTimeoutBoundsRender(t *testing.T) {
+	reg := render.NewRegistry()
+	reg.Register(ctxRenderer{})
+	sink := newRecordingSink()
+	p := render.NewPipeline(reg, sink)
+	p.SetDebounce(time.Millisecond)
+	p.SetTimeout(20 * time.Millisecond)
+
+	p.Schedule(&render.SourceDocument{URI: "file:///tmp/x.yaml", Text: "a"})
+
+	select {
+	case <-sink.done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("render never hit its deadline")
+	}
+
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	if len(sink.errs) != 1 || !errors.Is(sink.errs[0], context.DeadlineExceeded) {
+		t.Errorf("want one context.DeadlineExceeded, got %v", sink.errs)
 	}
 }
 
