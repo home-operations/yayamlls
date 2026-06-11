@@ -54,6 +54,10 @@ type Server struct {
 	// switch to event-driven tree invalidation.
 	clientWatchFiles bool
 
+	// clientSnippets records whether the client supports snippet completion
+	// items (tab stops and placeholders in insert text).
+	clientSnippets bool
+
 	// pendingShow holds show commands that arrived before the render was ready,
 	// keyed by URI; Notify fires the deferred window/showDocument once it lands.
 	showMu      sync.Mutex
@@ -153,6 +157,11 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	caps.CodeActionProvider = &protocol.CodeActionOptions{
 		CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 	}
+	// ":" fires value completion as soon as a key's colon is typed, " " in
+	// value/sequence position, "-" when starting a sequence item.
+	caps.CompletionProvider = &protocol.CompletionOptions{
+		TriggerCharacters: []string{":", " ", "-"},
+	}
 	// glsp wires the WorkspaceDidChangeWorkspaceFolders handler but doesn't set
 	// this capability, and clients withhold the notification until it's declared.
 	caps.Workspace = &protocol.ServerCapabilitiesWorkspace{
@@ -164,6 +173,10 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 
 	if w := params.Capabilities.Window; w != nil && w.ShowDocument != nil && w.ShowDocument.Support {
 		s.clientShowDoc = true
+	}
+	if td := params.Capabilities.TextDocument; td != nil && td.Completion != nil &&
+		td.Completion.CompletionItem != nil && td.Completion.CompletionItem.SnippetSupport != nil {
+		s.clientSnippets = *td.Completion.CompletionItem.SnippetSupport
 	}
 	if w := params.Capabilities.Workspace; w != nil && w.DidChangeWatchedFiles != nil &&
 		w.DidChangeWatchedFiles.DynamicRegistration != nil && *w.DidChangeWatchedFiles.DynamicRegistration {

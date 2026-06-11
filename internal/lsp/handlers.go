@@ -112,7 +112,7 @@ func (s *Server) completion(ctx *glsp.Context, params *protocol.CompletionParams
 	if sch == nil {
 		return nil, nil
 	}
-	list := completion.At(d.Parsed(), params.Position, sch)
+	list := completion.At(d.Parsed(), params.Position, sch, completion.Options{Snippets: s.clientSnippets})
 	if list == nil {
 		return nil, nil
 	}

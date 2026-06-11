@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -152,6 +153,11 @@ func TestInitializeHandshake(t *testing.T) {
 	folders, _ := wsFolders["workspaceFolders"].(map[string]any)
 	if folders["supported"] != true {
 		t.Errorf("workspace folder support not advertised; caps=%v", caps)
+	}
+	completion, _ := caps["completionProvider"].(map[string]any)
+	triggers, _ := completion["triggerCharacters"].([]any)
+	if !slices.Contains(triggers, any(":")) {
+		t.Errorf("completion trigger characters missing %q; caps=%v", ":", caps)
 	}
 	info, ok := result["serverInfo"].(map[string]any)
 	if !ok || info["name"] != "yayamlls" {

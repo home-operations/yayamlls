@@ -3,6 +3,7 @@ package completion
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
@@ -10,7 +11,14 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-func At(parsed *yamlast.Parsed, pos protocol.Position, sch *jsonschema.Schema) *protocol.CompletionList {
+// Options carries client capabilities that shape completion items.
+type Options struct {
+	// Snippets is whether the client advertised
+	// textDocument.completion.completionItem.snippetSupport.
+	Snippets bool
+}
+
+func At(parsed *yamlast.Parsed, pos protocol.Position, sch *jsonschema.Schema, opts Options) *protocol.CompletionList {
 	if sch == nil || parsed == nil {
 		return nil
 	}
@@ -20,13 +28,53 @@ func At(parsed *yamlast.Parsed, pos protocol.Position, sch *jsonschema.Schema) *
 	if target == nil {
 		return nil
 	}
+	ic := insertContext(parsed.Text, pos, opts)
 	if ctx.IsKey {
-		return propertyCompletions(target)
+		return propertyCompletions(target, ic)
 	}
-	return valueCompletions(target)
+	return valueCompletions(target, ic)
 }
 
-func propertyCompletions(s *jsonschema.Schema) *protocol.CompletionList {
+// insertCtx captures how completion text must be shaped at the cursor:
+// snippet capability, the indent for snippet continuation lines, and whether
+// a separating space is needed because the cursor sits right after a bare
+// ":" or "-" (the trigger characters fire before the user types one).
+type insertCtx struct {
+	snippets  bool
+	indent    string
+	needSpace bool
+}
+
+func insertContext(text string, pos protocol.Position, opts Options) insertCtx {
+	prefix := yamlast.LinePrefix(text, pos)
+	return insertCtx{
+		snippets:  opts.Snippets,
+		indent:    relIndent(prefix),
+		needSpace: strings.HasSuffix(prefix, ":") || strings.HasSuffix(prefix, "-"),
+	}
+}
+
+// relIndent computes the indent for snippet continuation lines. Snippet
+// clients prepend the insertion line's leading whitespace to every
+// continuation line, so the result is relative to it: children of the
+// completed key sit two spaces past where the typed word starts.
+func relIndent(prefix string) string {
+	ws := 0
+	for ws < len(prefix) && (prefix[ws] == ' ' || prefix[ws] == '\t') {
+		ws++
+	}
+	wordStart := strings.LastIndexByte(prefix, ' ') + 1
+	if strings.HasSuffix(prefix, "-") {
+		// The dash trigger inserts " key", placing the word one past the dash.
+		wordStart = len(prefix) + 1
+	}
+	if wordStart < ws {
+		wordStart = ws
+	}
+	return strings.Repeat(" ", wordStart-ws+2)
+}
+
+func propertyCompletions(s *jsonschema.Schema, ic insertCtx) *protocol.CompletionList {
 	props := schema.Properties(s)
 	if len(props) == 0 {
 		return nil
@@ -44,19 +92,77 @@ func propertyCompletions(s *jsonschema.Schema) *protocol.CompletionList {
 	for _, k := range keys {
 		ps := props[k]
 		kind := propertyKind(ps)
-		items = append(items, protocol.CompletionItem{
+		insert, isSnippet := insertTextForProperty(k, ps, ic)
+		if ic.needSpace {
+			insert = " " + insert
+		}
+		item := protocol.CompletionItem{
 			Label:         k,
 			Kind:          &kind,
 			Detail:        detail(ps),
 			Documentation: documentation(ps),
-			InsertText:    ptrStr(k + ": "),
+			InsertText:    ptrStr(insert),
 			SortText:      ptrStr(sortKey(k, required[k])),
-		})
+		}
+		if isSnippet {
+			f := protocol.InsertTextFormatSnippet
+			item.InsertTextFormat = &f
+		}
+		items = append(items, item)
 	}
 	return &protocol.CompletionList{Items: items}
 }
 
-func valueCompletions(s *jsonschema.Schema) *protocol.CompletionList {
+// insertTextForProperty shapes what accepting property k inserts. Without
+// snippet support it stays the plain "k: "; with it, a tab stop lands where
+// the value goes: objects open an indented block (one level of required
+// children pre-expanded, no recursion), arrays open an item, scalars carry
+// their default as the placeholder.
+func insertTextForProperty(k string, ps *jsonschema.Schema, ic insertCtx) (string, bool) {
+	if !ic.snippets {
+		return k + ": ", false
+	}
+	rs := schema.Resolve(ps, "")
+	switch {
+	case isType(rs, "object"):
+		if req := schema.Required(rs); len(req) > 0 {
+			sort.Strings(req)
+			var b strings.Builder
+			b.WriteString(k + ":")
+			for i, child := range req {
+				fmt.Fprintf(&b, "\n%s%s: $%d", ic.indent, child, i+1)
+			}
+			return b.String(), true
+		}
+		return k + ":\n" + ic.indent + "$1", true
+	case isType(rs, "array"):
+		return k + ":\n" + ic.indent + "- $1", true
+	default:
+		if rs != nil && rs.Default != nil {
+			return fmt.Sprintf("%s: ${1:%s}", k, snippetEscape(fmt.Sprintf("%v", *rs.Default))), true
+		}
+		return k + ": $1", true
+	}
+}
+
+func isType(s *jsonschema.Schema, t string) bool {
+	if s == nil || s.Types == nil {
+		return false
+	}
+	for _, st := range s.Types.ToStrings() {
+		if st == t {
+			return true
+		}
+	}
+	return false
+}
+
+// snippetEscape escapes the characters the LSP snippet grammar reserves.
+var snippetEscaper = strings.NewReplacer(`\`, `\\`, `$`, `\$`, `}`, `\}`)
+
+func snippetEscape(s string) string { return snippetEscaper.Replace(s) }
+
+func valueCompletions(s *jsonschema.Schema, ic insertCtx) *protocol.CompletionList {
 	values := schema.Enums(s)
 	if len(values) == 0 {
 		values = impliedValues(s)
@@ -67,10 +173,16 @@ func valueCompletions(s *jsonschema.Schema) *protocol.CompletionList {
 	kind := protocol.CompletionItemKindValue
 	items := make([]protocol.CompletionItem, 0, len(values))
 	for _, v := range values {
-		items = append(items, protocol.CompletionItem{
+		item := protocol.CompletionItem{
 			Label: fmt.Sprintf("%v", v),
 			Kind:  &kind,
-		})
+		}
+		if ic.needSpace {
+			// Right after "key:": insert " value" but keep the label bare so
+			// client-side filtering still matches what the user types.
+			item.InsertText = ptrStr(" " + item.Label)
+		}
+		items = append(items, item)
 	}
 	return &protocol.CompletionList{Items: items}
 }

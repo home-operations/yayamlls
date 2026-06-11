@@ -185,6 +185,30 @@ func collectEnums(s *jsonschema.Schema, add func(any), depth int) {
 	}
 }
 
+// Required returns the merged required-property names across $ref and
+// allOf/anyOf/oneOf branches, deduped, in first-seen order.
+func Required(s *jsonschema.Schema) []string {
+	var out []string
+	seen := make(map[string]bool)
+	collectRequired(follow(s), &out, seen, 0)
+	return out
+}
+
+func collectRequired(s *jsonschema.Schema, into *[]string, seen map[string]bool, depth int) {
+	if s == nil || depth > 16 {
+		return
+	}
+	for _, k := range s.Required {
+		if !seen[k] {
+			seen[k] = true
+			*into = append(*into, k)
+		}
+	}
+	for _, src := range mergeSources(s) {
+		collectRequired(src, into, seen, depth+1)
+	}
+}
+
 func collectProperties(s *jsonschema.Schema, into map[string]*jsonschema.Schema, depth int) {
 	if s == nil || depth > 16 {
 		return

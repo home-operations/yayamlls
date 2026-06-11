@@ -21,7 +21,7 @@ func TestCompletion_PropertyNamesAtKeyPosition(t *testing.T) {
 		t.Fatalf("schema compile: %v", err)
 	}
 
-	list := completion.At(yamlast.Parse(nil), protocol.Position{Line: 0, Character: 0}, sch)
+	list := completion.At(yamlast.Parse(nil), protocol.Position{Line: 0, Character: 0}, sch, completion.Options{})
 	if list == nil {
 		t.Fatalf("expected completion list, got nil")
 	}

@@ -250,6 +250,16 @@ func isKeyLine(text string, pos protocol.Position) bool {
 	return !strings.Contains(lineUpToUTF16(line, pos.Character), ":")
 }
 
+// LinePrefix returns the content of pos's line before the cursor column
+// (UTF-16 aware), or "" when the line is out of range.
+func LinePrefix(text string, pos protocol.Position) string {
+	line, ok := lineText(text, int(pos.Line))
+	if !ok {
+		return ""
+	}
+	return lineUpToUTF16(line, pos.Character)
+}
+
 // lineUpToUTF16 returns the prefix of line preceding the given UTF-16
 // column, or all of line when the column is at or past its end.
 func lineUpToUTF16(line string, utf16Col uint32) string {
