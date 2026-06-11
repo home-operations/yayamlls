@@ -1,6 +1,10 @@
 package folding
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/home-operations/yayamlls/internal/yamlast"
+)
 
 func TestRanges_MultilineMappingAndSequence(t *testing.T) {
 	text := `spec:
@@ -9,7 +13,7 @@ func TestRanges_MultilineMappingAndSequence(t *testing.T) {
       image: nginx
   replicas: 3
 `
-	got := Ranges(text)
+	got := Ranges(yamlast.Parse([]byte(text)))
 	if len(got) == 0 {
 		t.Fatalf("expected at least one folding range, got 0")
 	}
@@ -32,7 +36,7 @@ func TestRanges_MultilineMappingAndSequence(t *testing.T) {
 }
 
 func TestRanges_NoRangeForSingleLineDoc(t *testing.T) {
-	if got := Ranges("name: x\n"); len(got) != 0 {
+	if got := Ranges(yamlast.Parse([]byte("name: x\n"))); len(got) != 0 {
 		t.Errorf("expected zero ranges for single-line doc, got %+v", got)
 	}
 }

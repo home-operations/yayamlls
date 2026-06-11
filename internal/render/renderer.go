@@ -179,9 +179,8 @@ func (r *Registry) All() []Renderer {
 	return append(append([]Renderer(nil), r.providers...), r.dynamic...)
 }
 
-func AnalyzeDocument(uri, path, text string) *SourceDocument {
-	parsed := yamlast.Parse([]byte(text))
-	if parsed.File == nil || len(parsed.File.Docs) == 0 {
+func AnalyzeDocument(uri, path string, parsed *yamlast.Parsed) *SourceDocument {
+	if parsed == nil || parsed.File == nil || len(parsed.File.Docs) == 0 {
 		return nil
 	}
 	doc := parsed.File.Docs[0]
@@ -196,7 +195,7 @@ func AnalyzeDocument(uri, path, text string) *SourceDocument {
 	return &SourceDocument{
 		URI:      uri,
 		Path:     path,
-		Text:     text,
+		Text:     parsed.Text,
 		AST:      parsed.File,
 		Kind:     head.Kind,
 		APIGroup: group + versionSep(group, version),

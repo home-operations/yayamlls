@@ -13,6 +13,7 @@ import (
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/uri"
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -109,7 +110,7 @@ func validateFile(path string, resolver *schema.Resolver, store *schema.Store, o
 		return fileResult{errLines: []string{"yayamlls: " + err.Error()}, failed: true}
 	}
 	text := string(b)
-	diags := Document(text, path, resolver, store, opts)
+	diags := Document(yamlast.Parse(b), path, resolver, store, opts)
 	diags = diagnostics.ParseSuppressions(text).Filter(diags)
 
 	var res fileResult

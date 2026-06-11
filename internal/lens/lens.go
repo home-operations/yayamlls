@@ -16,11 +16,11 @@ const (
 	CommandShowRenderedDiff = "yayamlls.showRenderedDiff"
 )
 
-func Lenses(uri, text string) []protocol.CodeLens {
-	parsed := yamlast.Parse([]byte(text))
-	if parsed.File == nil {
+func Lenses(uri string, parsed *yamlast.Parsed) []protocol.CodeLens {
+	if parsed == nil || parsed.File == nil {
 		return nil
 	}
+	text := parsed.Text
 	var out []protocol.CodeLens
 	for _, doc := range parsed.File.Docs {
 		if doc == nil || doc.Body == nil {

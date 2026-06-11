@@ -357,7 +357,7 @@ func (s *Server) schedulePublish(d *document.Document) {
 
 	go func() {
 		// nil marshals to `null`; clients keep stale diagnostics on `null`.
-		diags := lint.Document(d.Text, uriToPath(uri), s.resolver, s.schemas, opts)
+		diags := lint.Document(d.Parsed(), uriToPath(uri), s.resolver, s.schemas, opts)
 		diags = append(diags, s.renderedDiagnosticsFor(uri)...)
 		diags = diagnostics.ParseSuppressions(d.Text).Filter(diags)
 

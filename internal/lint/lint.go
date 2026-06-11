@@ -18,16 +18,16 @@ import (
 // count; the Store coalesces concurrent fetches of the same schema.
 const docConcurrency = 8
 
-// Document validates a single file's text. path is the on-disk path used
-// for relative schema resolution. It returns the parse error (if any),
+// Document validates a single file's parsed text. path is the on-disk path
+// used for relative schema resolution. It returns the parse error (if any),
 // per-document schema violations, and one schema-load failure per
 // user-intended ref. It does not apply yayamlls-disable suppressions;
 // callers filter, so the LSP server can suppress rendered diagnostics in
 // the same pass.
 func Document(
-	text, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
+	parsed *yamlast.Parsed, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
 ) []protocol.Diagnostic {
-	parsed := yamlast.Parse([]byte(text))
+	text := parsed.Text
 	fileRef := resolver.Resolve(text, path)
 
 	diags := []protocol.Diagnostic{}

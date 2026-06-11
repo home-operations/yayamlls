@@ -69,7 +69,7 @@ func (s *Server) schemaAtCursor(uri string, pos protocol.Position) *jsonschema.S
 	path := uriToPath(d.URI)
 	ref := s.resolver.Resolve(d.Text, path)
 	if ref == "" {
-		parsed := yamlast.ParseForCursor(d.Text, int(pos.Line))
+		parsed := yamlast.ForCursor(d.Parsed(), int(pos.Line))
 		cur := yamlast.LocateCursor(parsed, d.Text, pos)
 		if cur.Doc != nil {
 			ref = s.resolver.K8sURLForNode(cur.Doc.Body)
@@ -97,7 +97,7 @@ func (s *Server) hover(ctx *glsp.Context, params *protocol.HoverParams) (*protoc
 	if sch == nil {
 		return nil, nil
 	}
-	return hover.At(d.Text, params.Position, sch), nil
+	return hover.At(d.Parsed(), params.Position, sch), nil
 }
 
 func (s *Server) completion(ctx *glsp.Context, params *protocol.CompletionParams) (any, error) {
@@ -109,7 +109,7 @@ func (s *Server) completion(ctx *glsp.Context, params *protocol.CompletionParams
 	if sch == nil {
 		return nil, nil
 	}
-	list := completion.At(d.Text, params.Position, sch)
+	list := completion.At(d.Parsed(), params.Position, sch)
 	if list == nil {
 		return nil, nil
 	}
@@ -121,7 +121,7 @@ func (s *Server) foldingRange(ctx *glsp.Context, params *protocol.FoldingRangePa
 	if !ok {
 		return nil, nil
 	}
-	return folding.Ranges(d.Text), nil
+	return folding.Ranges(d.Parsed()), nil
 }
 
 func (s *Server) documentLink(ctx *glsp.Context, params *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
@@ -137,7 +137,7 @@ func (s *Server) documentSymbol(ctx *glsp.Context, params *protocol.DocumentSymb
 	if !ok {
 		return nil, nil
 	}
-	return symbols.Outline(d.Text), nil
+	return symbols.Outline(d.Parsed()), nil
 }
 
 func (s *Server) codeAction(ctx *glsp.Context, params *protocol.CodeActionParams) (any, error) {
@@ -158,7 +158,7 @@ func (s *Server) codeLens(ctx *glsp.Context, params *protocol.CodeLensParams) ([
 	if !ok {
 		return nil, nil
 	}
-	return lens.Lenses(d.URI, d.Text), nil
+	return lens.Lenses(d.URI, d.Parsed()), nil
 }
 
 func (s *Server) executeCommand(ctx *glsp.Context, params *protocol.ExecuteCommandParams) (any, error) {
@@ -216,7 +216,7 @@ func (s *Server) scheduleRenderForURI(uri string) {
 	if !ok {
 		return
 	}
-	if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Text); src != nil {
+	if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Parsed()); src != nil {
 		s.pipeline.Schedule(src)
 	}
 }
@@ -263,7 +263,7 @@ func (s *Server) didChangeConfig(ctx *glsp.Context, params *protocol.DidChangeCo
 func (s *Server) publishDiagnostics(ctx *glsp.Context, d *document.Document) {
 	s.captureNotify(ctx)
 	if s.kubernetesEnabled() {
-		if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Text); src != nil {
+		if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Parsed()); src != nil {
 			s.pipeline.Schedule(src)
 		}
 	}

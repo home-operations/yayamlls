@@ -11,11 +11,11 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-func Outline(text string) []protocol.DocumentSymbol {
-	parsed := yamlast.Parse([]byte(text))
-	if parsed.File == nil {
+func Outline(parsed *yamlast.Parsed) []protocol.DocumentSymbol {
+	if parsed == nil || parsed.File == nil {
 		return nil
 	}
+	text := parsed.Text
 	var out []protocol.DocumentSymbol
 	for _, doc := range parsed.File.Docs {
 		if doc.Body == nil {
