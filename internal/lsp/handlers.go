@@ -37,16 +37,18 @@ func (s *Server) didOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocument
 
 func (s *Server) didChange(ctx *glsp.Context, params *protocol.DidChangeTextDocumentParams) error {
 	td := params.TextDocument
-	d, err := s.docs.Apply(td.URI, td.Version, params.ContentChanges)
-	if err != nil {
+	if _, err := s.docs.Apply(td.URI, td.Version, params.ContentChanges); err != nil {
 		return err
 	}
-	s.publishDiagnostics(ctx, d)
+	// captureNotify must run here: the debounce timer callback has no ctx.
+	s.captureNotify(ctx)
+	s.debouncePublish(td.URI)
 	return nil
 }
 
 func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
 	uri := params.TextDocument.URI
+	s.cancelDebounce(uri)
 	s.forgetPublish(uri)
 	s.clearDiagnostics(ctx, uri)
 	s.docs.Close(uri)

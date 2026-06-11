@@ -17,6 +17,11 @@ import (
 
 const lsName = "yayamlls"
 
+// defaultLintDebounce coalesces a burst of didChange notifications into one
+// diagnostics pass. It is intentionally shorter than the render debounce so
+// schema feedback still feels immediate.
+const defaultLintDebounce = 200 * time.Millisecond
+
 type Server struct {
 	docs     *document.Store
 	schemas  *schema.Store
@@ -53,6 +58,13 @@ type Server struct {
 	pubMu  sync.Mutex
 	pubSeq map[string]uint64
 
+	// lintTimers debounces didChange diagnostics per URI so typing doesn't
+	// trigger a parse+validate per keystroke. didOpen and config changes
+	// publish immediately. lintDebounce is set once in New (tests lower it).
+	lintMu       sync.Mutex
+	lintTimers   map[string]*time.Timer
+	lintDebounce time.Duration
+
 	// settings is the effective merge; workspaceSettings (from .yayamlls.yaml)
 	// is the lowest-precedence layer and overrides holds initializationOptions
 	// + didChangeConfiguration. Tracking the layers separately lets a
@@ -79,6 +91,8 @@ func New(version string, registry *render.Registry) *Server {
 		renderedBaseline: make(map[string][]byte),
 		pubSeq:           make(map[string]uint64),
 		pendingShow:      make(map[string]string),
+		lintTimers:       make(map[string]*time.Timer),
+		lintDebounce:     defaultLintDebounce,
 		version:          version,
 	}
 	s.pipeline = render.NewPipeline(registry, s)
@@ -386,6 +400,37 @@ func (s *Server) currentCall() glsp.CallFunc {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 	return s.connCall
+}
+
+// debouncePublish coalesces a burst of didChange notifications into one
+// diagnostics pass. The timer re-reads the store when it fires, so it always
+// lints the newest text, and a close in the window finds no document and
+// publishes nothing.
+func (s *Server) debouncePublish(uri string) {
+	s.lintMu.Lock()
+	if t, ok := s.lintTimers[uri]; ok {
+		t.Stop()
+	}
+	s.lintTimers[uri] = time.AfterFunc(s.lintDebounce, func() {
+		s.lintMu.Lock()
+		delete(s.lintTimers, uri)
+		s.lintMu.Unlock()
+		if d, ok := s.docs.Get(uri); ok {
+			s.publishDiagnostics(nil, d)
+		}
+	})
+	s.lintMu.Unlock()
+}
+
+// cancelDebounce drops a pending debounced publish, called from didClose so
+// a timer can't fire for a document that is no longer open.
+func (s *Server) cancelDebounce(uri string) {
+	s.lintMu.Lock()
+	if t, ok := s.lintTimers[uri]; ok {
+		t.Stop()
+		delete(s.lintTimers, uri)
+	}
+	s.lintMu.Unlock()
 }
 
 // forgetPublish drops a closed document's counter so an in-flight publish
