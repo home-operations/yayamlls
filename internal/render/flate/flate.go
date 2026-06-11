@@ -210,7 +210,6 @@ func buildTree(ctx context.Context, root string) *treeRender {
 		GitDepth:               1,
 		HelmTemplateCacheBytes: helm.DefaultTemplateCacheBytes,
 		HelmRenderCacheBytes:   helm.DefaultRenderCacheBytes,
-		StageCacheBytes:        2048 << 20,
 	})
 	if err != nil {
 		return &treeRender{err: err}
