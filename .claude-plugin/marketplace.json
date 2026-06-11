@@ -5,13 +5,19 @@
     "name": "home-operations"
   },
   "description": "The yayamlls YAML language server, packaged as a Claude Code plugin.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "plugins": [
     {
       "name": "yayamlls",
       "source": "./editors/claude",
       "description": "Schema-driven YAML diagnostics, completion, hover, and Flux rendering, powered by the yayamlls language server.",
-      "keywords": ["yaml", "lsp", "kubernetes", "flux", "json-schema"]
+      "keywords": [
+        "yaml",
+        "lsp",
+        "kubernetes",
+        "flux",
+        "json-schema"
+      ]
     }
   ]
 }
