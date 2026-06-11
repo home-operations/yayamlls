@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/home-operations/yayamlls/internal/actions"
 	"github.com/home-operations/yayamlls/internal/completion"
@@ -230,16 +231,57 @@ func (s *Server) didChangeWorkspaceFolders(ctx *glsp.Context, params *protocol.D
 		// rather than wiping them (and the override layer with them).
 		return nil
 	}
-	root := added[0].URI
+	s.settingsMu.Lock()
+	s.workspaceRoot = added[0].URI
+	s.settingsMu.Unlock()
+	s.reloadWorkspaceConfig(ctx)
+	return nil
+}
+
+// reloadWorkspaceConfig re-reads .yayamlls.yaml from the current workspace
+// root into the workspace layer and republishes every open document.
+func (s *Server) reloadWorkspaceConfig(ctx *glsp.Context) {
+	s.settingsMu.Lock()
+	root := s.workspaceRoot
+	s.settingsMu.Unlock()
 	var ws config.Settings
 	if loaded, err := config.LoadFromWorkspace(root); err == nil {
 		ws = loaded
 	}
-	s.workspaceRoot = root
 	s.setWorkspaceLayer(ws)
 	for _, uri := range s.docs.AllURIs() {
 		if d, ok := s.docs.Get(uri); ok {
 			s.publishDiagnostics(ctx, d)
+		}
+	}
+}
+
+// didChangeWatchedFiles reacts to external file changes: a workspace config
+// edit reloads settings, and any YAML change invalidates tree-derived render
+// caches so open Flux documents re-render against the new tree.
+func (s *Server) didChangeWatchedFiles(ctx *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
+	s.captureNotify(ctx)
+	var configChanged, treeChanged bool
+	for _, ev := range params.Changes {
+		path := uriToPath(ev.URI)
+		switch filepath.Base(path) {
+		case config.WorkspaceConfigFile, config.WorkspaceConfigFileFallback:
+			configChanged = true
+		default:
+			s.renderer.InvalidateTree(path)
+			treeChanged = true
+		}
+	}
+	if configChanged {
+		s.reloadWorkspaceConfig(ctx)
+	}
+	if treeChanged && s.kubernetesEnabled() {
+		// Order matters: the tree generations were bumped above, so clearing
+		// the pipeline's per-URI cache before re-scheduling guarantees fresh
+		// renders rather than replayed stale results.
+		s.pipeline.InvalidateAll()
+		for _, uri := range s.docs.AllURIs() {
+			s.scheduleRenderForURI(uri)
 		}
 	}
 	return nil

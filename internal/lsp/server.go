@@ -48,6 +48,12 @@ type Server struct {
 	// editor; otherwise they return it as a payload for the bundled extensions.
 	clientShowDoc bool
 
+	// clientWatchFiles records whether the client supports dynamic
+	// registration for workspace/didChangeWatchedFiles (the spec offers no
+	// static form). When set, initialized registers watchers and renderers
+	// switch to event-driven tree invalidation.
+	clientWatchFiles bool
+
 	// pendingShow holds show commands that arrived before the render was ready,
 	// keyed by URI; Notify fires the deferred window/showDocument once it lands.
 	showMu      sync.Mutex
@@ -118,6 +124,7 @@ func New(version string, registry *render.Registry) *Server {
 
 		WorkspaceDidChangeConfiguration:    s.didChangeConfig,
 		WorkspaceDidChangeWorkspaceFolders: s.didChangeWorkspaceFolders,
+		WorkspaceDidChangeWatchedFiles:     s.didChangeWatchedFiles,
 		WorkspaceExecuteCommand:            s.executeCommand,
 	}
 	return s
@@ -158,6 +165,10 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	if w := params.Capabilities.Window; w != nil && w.ShowDocument != nil && w.ShowDocument.Support {
 		s.clientShowDoc = true
 	}
+	if w := params.Capabilities.Workspace; w != nil && w.DidChangeWatchedFiles != nil &&
+		w.DidChangeWatchedFiles.DynamicRegistration != nil && *w.DidChangeWatchedFiles.DynamicRegistration {
+		s.clientWatchFiles = true
+	}
 
 	root := pickWorkspaceRoot(params)
 	var (
@@ -165,7 +176,6 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 		err error
 	)
 	if root != "" {
-		s.workspaceRoot = root
 		ws, err = config.LoadFromWorkspace(root)
 		if err != nil {
 			notifyShowMessage(ctx, protocol.MessageTypeWarning,
@@ -173,6 +183,9 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 		}
 	}
 	s.settingsMu.Lock()
+	if root != "" {
+		s.workspaceRoot = root
+	}
 	s.workspaceSettings = ws
 	if init := settingsFromInitOptions(params.InitializationOptions); init != nil {
 		s.overrides = *init
@@ -228,9 +241,10 @@ func (s *Server) applyLayers() {
 	s.settingsMu.Lock()
 	effective := config.Merge(s.workspaceSettings, s.overrides)
 	s.settings = effective
+	root := s.workspaceRoot
 	s.settingsMu.Unlock()
 	s.resolver.SetSettings(effective)
-	s.renderer.SetWorkspaceRoot(uriToPath(s.workspaceRoot))
+	s.renderer.SetWorkspaceRoot(uriToPath(root))
 	s.renderer.Configure(effective.Renderers)
 	debounce := render.DefaultDebounce
 	if ms := effective.RenderDebounceMs; ms != nil && *ms > 0 {
@@ -275,6 +289,37 @@ func notifyShowMessage(ctx *glsp.Context, level protocol.MessageType, msg string
 }
 
 func (s *Server) initialized(ctx *glsp.Context, params *protocol.InitializedParams) error {
+	s.captureNotify(ctx)
+	if !s.clientWatchFiles {
+		return nil
+	}
+	// Optimistic: a client advertising dynamicRegistration honors the
+	// registration. Non-watching clients keep the fingerprint fallback.
+	s.renderer.SetFileWatchActive(true)
+	call := s.currentCall()
+	if call == nil {
+		return nil
+	}
+	// glsp dispatches on the jsonrpc2 read loop, so a blocking Call from
+	// inside a handler would deadlock waiting for its own response; register
+	// asynchronously (same pattern as showInEditor).
+	go func() {
+		var result any
+		call(protocol.ServerClientRegisterCapability, protocol.RegistrationParams{
+			Registrations: []protocol.Registration{{
+				ID:     "yayamlls.watchedFiles",
+				Method: protocol.MethodWorkspaceDidChangeWatchedFiles,
+				RegisterOptions: protocol.DidChangeWatchedFilesRegistrationOptions{
+					Watchers: []protocol.FileSystemWatcher{
+						{GlobPattern: "**/*.{yaml,yml}"},
+						// Separate watcher: `*` does not match a leading dot
+						// in every client's glob implementation.
+						{GlobPattern: "**/.{yayamlls,yamlls}.yaml"},
+					},
+				},
+			}},
+		}, &result)
+	}()
 	return nil
 }
 
@@ -288,6 +333,12 @@ func (s *Server) setTrace(ctx *glsp.Context, params *protocol.SetTraceParams) er
 	return nil
 }
 
+// cancelRequest is deliberately a no-op. glsp dispatches every message
+// synchronously on the jsonrpc2 read goroutine and exposes no request ID to
+// handlers, so by the time a $/cancelRequest is read off the wire the request
+// it targets has always completed. The useful equivalents exist elsewhere:
+// the render pipeline supersedes-and-cancels on newer content, pubSeq drops
+// superseded diagnostics, and renders carry a timeout.
 func (s *Server) cancelRequest(ctx *glsp.Context, params *protocol.CancelParams) error {
 	return nil
 }
