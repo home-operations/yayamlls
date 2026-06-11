@@ -22,6 +22,11 @@
           "type": "json",
           "path": "editors/claude/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "editors/zed/extension.toml",
+          "jsonpath": "$.version"
         }
       ]
     }
