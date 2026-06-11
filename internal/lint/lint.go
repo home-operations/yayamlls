@@ -89,6 +89,12 @@ func validateOneDoc(
 	doc *ast.DocumentNode, fileRef, text, path string,
 	resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
 ) docResult {
+	if emptyDoc(doc) {
+		// A modeline above the first `---` parses as a comment-only leading
+		// document; validating its null body against the schema would emit a
+		// bogus "got null, want object" at 1:1.
+		return docResult{}
+	}
 	ref := schema.FindModelineSchemaForDoc(doc)
 	if ref == "" {
 		ref = fileRef
@@ -108,6 +114,16 @@ func validateOneDoc(
 		return docResult{}
 	}
 	return docResult{diags: diagnostics.ValidateDoc(doc, sch, text, opts)}
+}
+
+// emptyDoc reports whether a document carries no content to validate:
+// nothing at all, or only comments.
+func emptyDoc(doc *ast.DocumentNode) bool {
+	if doc == nil || doc.Body == nil {
+		return true
+	}
+	_, commentOnly := doc.Body.(*ast.CommentGroupNode)
+	return commentOnly
 }
 
 // SchemaLoadDiagnostic is the file-level warning emitted when a
