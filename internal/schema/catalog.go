@@ -2,8 +2,6 @@ package schema
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -91,22 +89,11 @@ func startsWithStar(pat string) bool {
 }
 
 func (c *Catalog) load() {
-	req, err := http.NewRequest(http.MethodGet, c.URL, nil)
-	if err != nil {
-		c.loadErr = err
-		return
-	}
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		c.loadErr = err
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		c.loadErr = fmt.Errorf("catalog: HTTP %d", resp.StatusCode)
-		return
-	}
-	body, err := io.ReadAll(resp.Body)
+	// The disk loader gives the ~700KB catalog the same caching as schema
+	// bodies: served from disk inside the freshness TTL, ETag-revalidated
+	// after, stale-but-usable when offline.
+	loader := &diskLoader{client: c.Client}
+	body, err := loader.loadBytes(c.URL)
 	if err != nil {
 		c.loadErr = err
 		return
