@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/home-operations/yayamlls/compare/0.1.1...0.1.2) (2026-06-11)
+
+
+### Features
+
+* **deps:** update dependency vscode (1.123.0 → 1.124.0) ([#47](https://github.com/home-operations/yayamlls/issues/47)) ([2d0d665](https://github.com/home-operations/yayamlls/commit/2d0d66520f07800da501639e18047be0155a84df))
+* **deps:** update module github.com/home-operations/flate (v0.3.3 → v0.4.1) ([2543cfc](https://github.com/home-operations/yayamlls/commit/2543cfc08518ef64545765200c3c8eae9321e901))
+* **render:** make the render deadline configurable via renderTimeoutMs ([b30f53e](https://github.com/home-operations/yayamlls/commit/b30f53ed082d670e83e5b803c9b7d6d0b1de653b))
+
 ## [0.1.1](https://github.com/home-operations/yayamlls/compare/0.1.0...0.1.1) (2026-06-08)
 
 
