@@ -8,6 +8,7 @@ import (
 
 	"github.com/home-operations/yayamlls/internal/hover"
 	"github.com/home-operations/yayamlls/internal/schema"
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -22,7 +23,7 @@ func TestHover_ReturnsDescriptionForProperty(t *testing.T) {
 	}
 	text := "name: Alice\nage: 30\n"
 	pos := protocol.Position{Line: 1, Character: 5}
-	h := hover.At(text, pos, sch)
+	h := hover.At(yamlast.Parse([]byte(text)), pos, sch)
 	if h == nil {
 		t.Fatalf("expected hover, got nil")
 	}

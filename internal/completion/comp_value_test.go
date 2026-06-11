@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/home-operations/yayamlls/internal/completion"
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
@@ -37,7 +38,7 @@ func TestCompletion_ValuesAtValuePosition(t *testing.T) {
 	}`)
 	text := "tier: \nenabled: \n"
 	// cursor right after "tier: "
-	list := completion.At(text, protocol.Position{Line: 0, Character: 6}, sch)
+	list := completion.At(yamlast.Parse([]byte(text)), protocol.Position{Line: 0, Character: 6}, sch, completion.Options{})
 	if list == nil {
 		t.Fatal("nil list for tier value")
 	}
@@ -51,7 +52,7 @@ func TestCompletion_ValuesAtValuePosition(t *testing.T) {
 			t.Errorf("tier missing %q: %v", w, got)
 		}
 	}
-	list2 := completion.At(text, protocol.Position{Line: 1, Character: 9}, sch)
+	list2 := completion.At(yamlast.Parse([]byte(text)), protocol.Position{Line: 1, Character: 9}, sch, completion.Options{})
 	if list2 == nil {
 		t.Fatal("nil list for enabled value")
 	}

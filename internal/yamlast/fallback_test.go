@@ -33,3 +33,31 @@ func TestParseForCursor_RecoversFromBrokenLine(t *testing.T) {
 		t.Fatalf("expected recovered AST, got nil docs")
 	}
 }
+
+func TestForCursor_CleanParseReturnsSamePointer(t *testing.T) {
+	p := Parse([]byte("name: Alice\n"))
+	if p.Err != nil {
+		t.Fatalf("unexpected parse error: %v", p.Err)
+	}
+	if got := ForCursor(p, 0); got != p {
+		t.Errorf("ForCursor returned a new Parsed for a clean parse")
+	}
+}
+
+func TestForCursor_BrokenParseReturnsBlankedFallback(t *testing.T) {
+	text := "name: Alice\nage: \"thirty"
+	p := Parse([]byte(text))
+	if p.Err == nil {
+		t.Fatalf("expected parse error for broken text")
+	}
+	got := ForCursor(p, 1)
+	if got == p {
+		t.Fatalf("expected a distinct fallback Parsed")
+	}
+	if got.File == nil || len(got.File.Docs) == 0 {
+		t.Fatalf("expected recovered AST, got nil docs")
+	}
+	if p.Text != text {
+		t.Errorf("original Parsed mutated: %q", p.Text)
+	}
+}

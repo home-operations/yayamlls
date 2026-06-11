@@ -7,9 +7,8 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-func Ranges(text string) []protocol.FoldingRange {
-	parsed := yamlast.Parse([]byte(text))
-	if parsed.File == nil {
+func Ranges(parsed *yamlast.Parsed) []protocol.FoldingRange {
+	if parsed == nil || parsed.File == nil {
 		return nil
 	}
 	var out []protocol.FoldingRange

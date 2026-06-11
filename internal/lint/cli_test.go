@@ -60,6 +60,22 @@ func TestRun_ValidDocIsSilentAndExitsZero(t *testing.T) {
 	}
 }
 
+// A modeline above the first `---` parses as a comment-only leading
+// document; it must not be validated as null against the schema.
+func TestRun_ModelineAboveSeparatorNotValidatedAsNull(t *testing.T) {
+	root := setupWorkspace(t)
+	doc := filepath.Join(root, "ok.yaml")
+	mustWrite(t, doc, "# yaml-language-server: $schema=./person.json\n---\nname: Alice\nage: 30\n")
+
+	code, stdout, stderr := run(t, root, doc)
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0 (stdout: %s, stderr: %s)", code, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected no output, got: %q", stdout)
+	}
+}
+
 func TestRun_InvalidDocReportsAndExitsOne(t *testing.T) {
 	root := setupWorkspace(t)
 	doc := filepath.Join(root, "bad.yaml")

@@ -13,6 +13,20 @@ type Document struct {
 	LanguageID string
 	Version    int32
 	Text       string
+
+	// parsed caches the AST for Text. A Document is immutable after
+	// construction (Apply builds a fresh one per change), so the parse
+	// runs at most once per version and is shared by every consumer.
+	parseOnce sync.Once
+	parsed    *yamlast.Parsed
+}
+
+// Parsed lazily parses Text. Safe for concurrent use; whichever consumer
+// arrives first pays the parse, the rest share the result. Consumers must
+// treat the returned AST as read-only.
+func (d *Document) Parsed() *yamlast.Parsed {
+	d.parseOnce.Do(func() { d.parsed = yamlast.Parse([]byte(d.Text)) })
+	return d.parsed
 }
 
 type Store struct {

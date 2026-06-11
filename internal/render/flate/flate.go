@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	yaml "github.com/goccy/go-yaml"
@@ -36,6 +37,12 @@ type Renderer struct {
 	disabled bool
 	root     string // configured build path (--path equivalent); empty = workspace root
 	wsRoot   string // workspace root, to anchor a relative root
+
+	// gen is bumped by InvalidateTree; once eventDriven is set (the client
+	// watches files for us) it replaces the per-render tree fingerprint as
+	// the cache key, skipping the whole-workspace walk entirely.
+	gen         atomic.Uint64
+	eventDriven atomic.Bool
 
 	// treeMu serializes whole-tree renders and guards cached: a blocked
 	// caller is served from the cache once the in-flight render finishes.
@@ -71,6 +78,33 @@ func (r *Renderer) SetWorkspaceRoot(root string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.wsRoot = root
+}
+
+// SetFileWatchActive switches the tree cache from per-render fingerprinting
+// to event-driven invalidation via InvalidateTree.
+func (r *Renderer) SetFileWatchActive(active bool) {
+	r.eventDriven.Store(active)
+}
+
+// InvalidateTree drops the cached whole-tree render when path is inside the
+// flate build root; changes elsewhere can't affect the render. An empty path
+// invalidates unconditionally.
+func (r *Renderer) InvalidateTree(path string) {
+	if path != "" {
+		root := r.targetRoot()
+		if root == "" || !underRoot(root, path) {
+			return
+		}
+	}
+	r.gen.Add(1)
+}
+
+func underRoot(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func (r *Renderer) IsEnabled() bool {
@@ -157,6 +191,7 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 type treeRender struct {
 	root        string
 	fingerprint string
+	gen         uint64
 	byKind      map[string][]manifest.NamedResource
 	manifests   map[manifest.NamedResource][]map[string]any
 	failed      map[manifest.NamedResource]store.StatusInfo
@@ -164,26 +199,42 @@ type treeRender struct {
 }
 
 // tree returns the cached whole-tree render for root, rebuilding it when the
-// tree's on-disk fingerprint changed. Remote source contents (git/OCI) can
-// drift without a local change; like flate's own disk caches, a workspace
-// file save is what triggers a re-render.
+// tree changed on disk: detected via InvalidateTree generations when the
+// client watches files, via a full-tree fingerprint walk otherwise. Remote
+// source contents (git/OCI) can drift without a local change; like flate's
+// own disk caches, a workspace file save is what triggers a re-render.
 func (r *Renderer) tree(ctx context.Context, root string) (*treeRender, error) {
-	fp, err := fingerprintTree(root)
-	if err != nil {
-		return nil, err
+	var fp string
+	var gen uint64
+	if r.eventDriven.Load() {
+		// Read before building: a mid-build invalidation leaves this entry
+		// stale, so the next render rebuilds.
+		gen = r.gen.Load()
+	} else {
+		var err error
+		if fp, err = fingerprintTree(root); err != nil {
+			return nil, err
+		}
 	}
 	r.treeMu.Lock()
 	defer r.treeMu.Unlock()
-	if c := r.cached; c != nil && c.root == root && c.fingerprint == fp {
+	if c := r.cached; c != nil && c.root == root && c.fingerprint == fp && c.gen == gen {
 		return c, c.err
 	}
 	t := buildTree(ctx, root)
 	// Never cache an interrupted render: a Run-phase cancellation still
 	// yields a Result, but one holding a partial tree.
 	if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			// Negative-cache genuine timeouts so a stall against an
+			// unreachable remote isn't re-spent per open document; the next
+			// tree change clears it. Superseded (Canceled) renders stay
+			// uncached as before.
+			r.cached = &treeRender{root: root, fingerprint: fp, gen: gen, err: ctx.Err()}
+		}
 		return nil, ctx.Err()
 	}
-	t.root, t.fingerprint = root, fp
+	t.root, t.fingerprint, t.gen = root, fp, gen
 	r.cached = t
 	return t, t.err
 }

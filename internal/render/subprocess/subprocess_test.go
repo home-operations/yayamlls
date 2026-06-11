@@ -10,6 +10,7 @@ import (
 
 	"github.com/home-operations/yayamlls/internal/render"
 	"github.com/home-operations/yayamlls/internal/render/subprocess"
+	"github.com/home-operations/yayamlls/internal/yamlast"
 )
 
 func TestFromConfig_RejectsIncomplete(t *testing.T) {
@@ -38,12 +39,12 @@ func TestFromConfig_BuildsAndMatches(t *testing.T) {
 		t.Errorf("name = %q", r.Name())
 	}
 	doc := render.AnalyzeDocument("file:///k.yaml", "/k.yaml",
-		"apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: app\n")
+		yamlast.Parse([]byte("apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: app\n")))
 	if !r.Matches(doc) {
 		t.Error("expected Kustomization to match")
 	}
 	other := render.AnalyzeDocument("file:///c.yaml", "/c.yaml",
-		"apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app\n")
+		yamlast.Parse([]byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app\n")))
 	if r.Matches(other) {
 		t.Error("ConfigMap should not match")
 	}

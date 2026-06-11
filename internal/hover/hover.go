@@ -10,12 +10,12 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-func At(text string, pos protocol.Position, sch *jsonschema.Schema) *protocol.Hover {
-	if sch == nil {
+func At(parsed *yamlast.Parsed, pos protocol.Position, sch *jsonschema.Schema) *protocol.Hover {
+	if sch == nil || parsed == nil {
 		return nil
 	}
-	parsed := yamlast.ParseForCursor(text, int(pos.Line))
-	ctx := yamlast.LocateCursor(parsed, text, pos)
+	p := yamlast.ForCursor(parsed, int(pos.Line))
+	ctx := yamlast.LocateCursor(p, parsed.Text, pos)
 	target := schema.Resolve(sch, ctx.Pointer)
 	if target == nil {
 		return nil

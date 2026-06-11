@@ -18,16 +18,16 @@ import (
 // count; the Store coalesces concurrent fetches of the same schema.
 const docConcurrency = 8
 
-// Document validates a single file's text. path is the on-disk path used
-// for relative schema resolution. It returns the parse error (if any),
+// Document validates a single file's parsed text. path is the on-disk path
+// used for relative schema resolution. It returns the parse error (if any),
 // per-document schema violations, and one schema-load failure per
 // user-intended ref. It does not apply yayamlls-disable suppressions;
 // callers filter, so the LSP server can suppress rendered diagnostics in
 // the same pass.
 func Document(
-	text, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
+	parsed *yamlast.Parsed, path string, resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
 ) []protocol.Diagnostic {
-	parsed := yamlast.Parse([]byte(text))
+	text := parsed.Text
 	fileRef := resolver.Resolve(text, path)
 
 	diags := []protocol.Diagnostic{}
@@ -89,6 +89,12 @@ func validateOneDoc(
 	doc *ast.DocumentNode, fileRef, text, path string,
 	resolver *schema.Resolver, store *schema.Store, opts diagnostics.Options,
 ) docResult {
+	if emptyDoc(doc) {
+		// A modeline above the first `---` parses as a comment-only leading
+		// document; validating its null body against the schema would emit a
+		// bogus "got null, want object" at 1:1.
+		return docResult{}
+	}
 	ref := schema.FindModelineSchemaForDoc(doc)
 	if ref == "" {
 		ref = fileRef
@@ -108,6 +114,16 @@ func validateOneDoc(
 		return docResult{}
 	}
 	return docResult{diags: diagnostics.ValidateDoc(doc, sch, text, opts)}
+}
+
+// emptyDoc reports whether a document carries no content to validate:
+// nothing at all, or only comments.
+func emptyDoc(doc *ast.DocumentNode) bool {
+	if doc == nil || doc.Body == nil {
+		return true
+	}
+	_, commentOnly := doc.Body.(*ast.CommentGroupNode)
+	return commentOnly
 }
 
 // SchemaLoadDiagnostic is the file-level warning emitted when a

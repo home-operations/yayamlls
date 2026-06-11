@@ -7,6 +7,7 @@ import (
 
 	"github.com/home-operations/yayamlls/internal/completion"
 	"github.com/home-operations/yayamlls/internal/schema"
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -20,7 +21,7 @@ func TestCompletion_PropertyNamesAtKeyPosition(t *testing.T) {
 		t.Fatalf("schema compile: %v", err)
 	}
 
-	list := completion.At("", protocol.Position{Line: 0, Character: 0}, sch)
+	list := completion.At(yamlast.Parse(nil), protocol.Position{Line: 0, Character: 0}, sch, completion.Options{})
 	if list == nil {
 		t.Fatalf("expected completion list, got nil")
 	}

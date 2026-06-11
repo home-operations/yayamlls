@@ -1,6 +1,10 @@
 package lens
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/home-operations/yayamlls/internal/yamlast"
+)
 
 func TestLenses_HelmRelease(t *testing.T) {
 	text := `---
@@ -9,7 +13,7 @@ kind: HelmRelease
 metadata:
   name: foo
 `
-	got := Lenses("file:///tmp/hr.yaml", text)
+	got := Lenses("file:///tmp/hr.yaml", yamlast.Parse([]byte(text)))
 	if len(got) != 2 {
 		t.Fatalf("expected 2 lenses (view + diff), got %d", len(got))
 	}
@@ -22,7 +26,7 @@ metadata:
 }
 
 func TestLenses_NonFluxDocNoLenses(t *testing.T) {
-	if got := Lenses("file:///tmp/x.yaml", "apiVersion: v1\nkind: Pod\n"); len(got) != 0 {
+	if got := Lenses("file:///tmp/x.yaml", yamlast.Parse([]byte("apiVersion: v1\nkind: Pod\n"))); len(got) != 0 {
 		t.Errorf("Pod shouldn't get Flux lenses, got %d", len(got))
 	}
 }

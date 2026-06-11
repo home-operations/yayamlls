@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/home-operations/yayamlls/internal/actions"
 	"github.com/home-operations/yayamlls/internal/completion"
@@ -37,16 +38,18 @@ func (s *Server) didOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocument
 
 func (s *Server) didChange(ctx *glsp.Context, params *protocol.DidChangeTextDocumentParams) error {
 	td := params.TextDocument
-	d, err := s.docs.Apply(td.URI, td.Version, params.ContentChanges)
-	if err != nil {
+	if _, err := s.docs.Apply(td.URI, td.Version, params.ContentChanges); err != nil {
 		return err
 	}
-	s.publishDiagnostics(ctx, d)
+	// captureNotify must run here: the debounce timer callback has no ctx.
+	s.captureNotify(ctx)
+	s.debouncePublish(td.URI)
 	return nil
 }
 
 func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
 	uri := params.TextDocument.URI
+	s.cancelDebounce(uri)
 	s.forgetPublish(uri)
 	s.clearDiagnostics(ctx, uri)
 	s.docs.Close(uri)
@@ -69,7 +72,7 @@ func (s *Server) schemaAtCursor(uri string, pos protocol.Position) *jsonschema.S
 	path := uriToPath(d.URI)
 	ref := s.resolver.Resolve(d.Text, path)
 	if ref == "" {
-		parsed := yamlast.ParseForCursor(d.Text, int(pos.Line))
+		parsed := yamlast.ForCursor(d.Parsed(), int(pos.Line))
 		cur := yamlast.LocateCursor(parsed, d.Text, pos)
 		if cur.Doc != nil {
 			ref = s.resolver.K8sURLForNode(cur.Doc.Body)
@@ -97,7 +100,7 @@ func (s *Server) hover(ctx *glsp.Context, params *protocol.HoverParams) (*protoc
 	if sch == nil {
 		return nil, nil
 	}
-	return hover.At(d.Text, params.Position, sch), nil
+	return hover.At(d.Parsed(), params.Position, sch), nil
 }
 
 func (s *Server) completion(ctx *glsp.Context, params *protocol.CompletionParams) (any, error) {
@@ -109,7 +112,7 @@ func (s *Server) completion(ctx *glsp.Context, params *protocol.CompletionParams
 	if sch == nil {
 		return nil, nil
 	}
-	list := completion.At(d.Text, params.Position, sch)
+	list := completion.At(d.Parsed(), params.Position, sch, completion.Options{Snippets: s.clientSnippets})
 	if list == nil {
 		return nil, nil
 	}
@@ -121,7 +124,7 @@ func (s *Server) foldingRange(ctx *glsp.Context, params *protocol.FoldingRangePa
 	if !ok {
 		return nil, nil
 	}
-	return folding.Ranges(d.Text), nil
+	return folding.Ranges(d.Parsed()), nil
 }
 
 func (s *Server) documentLink(ctx *glsp.Context, params *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
@@ -137,7 +140,7 @@ func (s *Server) documentSymbol(ctx *glsp.Context, params *protocol.DocumentSymb
 	if !ok {
 		return nil, nil
 	}
-	return symbols.Outline(d.Text), nil
+	return symbols.Outline(d.Parsed()), nil
 }
 
 func (s *Server) codeAction(ctx *glsp.Context, params *protocol.CodeActionParams) (any, error) {
@@ -158,7 +161,7 @@ func (s *Server) codeLens(ctx *glsp.Context, params *protocol.CodeLensParams) ([
 	if !ok {
 		return nil, nil
 	}
-	return lens.Lenses(d.URI, d.Text), nil
+	return lens.Lenses(d.URI, d.Parsed()), nil
 }
 
 func (s *Server) executeCommand(ctx *glsp.Context, params *protocol.ExecuteCommandParams) (any, error) {
@@ -216,7 +219,7 @@ func (s *Server) scheduleRenderForURI(uri string) {
 	if !ok {
 		return
 	}
-	if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Text); src != nil {
+	if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Parsed()); src != nil {
 		s.pipeline.Schedule(src)
 	}
 }
@@ -228,16 +231,57 @@ func (s *Server) didChangeWorkspaceFolders(ctx *glsp.Context, params *protocol.D
 		// rather than wiping them (and the override layer with them).
 		return nil
 	}
-	root := added[0].URI
+	s.settingsMu.Lock()
+	s.workspaceRoot = added[0].URI
+	s.settingsMu.Unlock()
+	s.reloadWorkspaceConfig(ctx)
+	return nil
+}
+
+// reloadWorkspaceConfig re-reads .yayamlls.yaml from the current workspace
+// root into the workspace layer and republishes every open document.
+func (s *Server) reloadWorkspaceConfig(ctx *glsp.Context) {
+	s.settingsMu.Lock()
+	root := s.workspaceRoot
+	s.settingsMu.Unlock()
 	var ws config.Settings
 	if loaded, err := config.LoadFromWorkspace(root); err == nil {
 		ws = loaded
 	}
-	s.workspaceRoot = root
 	s.setWorkspaceLayer(ws)
 	for _, uri := range s.docs.AllURIs() {
 		if d, ok := s.docs.Get(uri); ok {
 			s.publishDiagnostics(ctx, d)
+		}
+	}
+}
+
+// didChangeWatchedFiles reacts to external file changes: a workspace config
+// edit reloads settings, and any YAML change invalidates tree-derived render
+// caches so open Flux documents re-render against the new tree.
+func (s *Server) didChangeWatchedFiles(ctx *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
+	s.captureNotify(ctx)
+	var configChanged, treeChanged bool
+	for _, ev := range params.Changes {
+		path := uriToPath(ev.URI)
+		switch filepath.Base(path) {
+		case config.WorkspaceConfigFile, config.WorkspaceConfigFileFallback:
+			configChanged = true
+		default:
+			s.renderer.InvalidateTree(path)
+			treeChanged = true
+		}
+	}
+	if configChanged {
+		s.reloadWorkspaceConfig(ctx)
+	}
+	if treeChanged && s.kubernetesEnabled() {
+		// Order matters: the tree generations were bumped above, so clearing
+		// the pipeline's per-URI cache before re-scheduling guarantees fresh
+		// renders rather than replayed stale results.
+		s.pipeline.InvalidateAll()
+		for _, uri := range s.docs.AllURIs() {
+			s.scheduleRenderForURI(uri)
 		}
 	}
 	return nil
@@ -263,7 +307,7 @@ func (s *Server) didChangeConfig(ctx *glsp.Context, params *protocol.DidChangeCo
 func (s *Server) publishDiagnostics(ctx *glsp.Context, d *document.Document) {
 	s.captureNotify(ctx)
 	if s.kubernetesEnabled() {
-		if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Text); src != nil {
+		if src := render.AnalyzeDocument(d.URI, uriToPath(d.URI), d.Parsed()); src != nil {
 			s.pipeline.Schedule(src)
 		}
 	}

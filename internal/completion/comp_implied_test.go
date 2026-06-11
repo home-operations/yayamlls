@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/home-operations/yayamlls/internal/completion"
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -18,7 +19,7 @@ func TestCompletion_BooleanWithDefaultDeduplicated(t *testing.T) {
 		}
 	}`)
 	body := "enabled: \n"
-	list := completion.At(body, protocol.Position{Line: 0, Character: 9}, sch)
+	list := completion.At(yamlast.Parse([]byte(body)), protocol.Position{Line: 0, Character: 9}, sch, completion.Options{})
 	if list == nil {
 		t.Fatal("expected completions at boolean value position")
 	}
@@ -41,7 +42,7 @@ func TestCompletion_DefaultValueOffered(t *testing.T) {
 		}
 	}`)
 	body := "level: \n"
-	list := completion.At(body, protocol.Position{Line: 0, Character: 7}, sch)
+	list := completion.At(yamlast.Parse([]byte(body)), protocol.Position{Line: 0, Character: 7}, sch, completion.Options{})
 	if list == nil {
 		t.Fatal("expected completions at value position")
 	}

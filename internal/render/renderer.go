@@ -78,17 +78,31 @@ type WorkspaceAware interface {
 	SetWorkspaceRoot(root string)
 }
 
+// TreeInvalidator renderers cache state derived from the on-disk workspace
+// tree and drop it when a watched file changes. path is an absolute
+// filesystem path; renderers ignore paths outside their tree root.
+type TreeInvalidator interface {
+	InvalidateTree(path string)
+}
+
+// WatchAware renderers switch from per-render polling (fingerprinting) to
+// event-driven invalidation once LSP file watching is active.
+type WatchAware interface {
+	SetFileWatchActive(active bool)
+}
+
 // Factory builds a renderer from a config entry the registry doesn't already
 // know by name. It returns ok=false when the entry isn't one it can build
 // (e.g. config for a compiled-in renderer, or a malformed entry).
 type Factory func(name string, raw json.RawMessage) (Renderer, bool)
 
 type Registry struct {
-	mu        sync.RWMutex
-	providers []Renderer // compiled-in renderers (e.g. flate)
-	dynamic   []Renderer // built from config via factory, rebuilt on Configure
-	factory   Factory
-	wsRoot    string
+	mu          sync.RWMutex
+	providers   []Renderer // compiled-in renderers (e.g. flate)
+	dynamic     []Renderer // built from config via factory, rebuilt on Configure
+	factory     Factory
+	wsRoot      string
+	watchActive bool
 }
 
 func NewRegistry() *Registry { return &Registry{} }
@@ -156,6 +170,9 @@ func (r *Registry) Configure(configs map[string]json.RawMessage) {
 		if w, ok := p.(WorkspaceAware); ok && r.wsRoot != "" {
 			w.SetWorkspaceRoot(r.wsRoot)
 		}
+		if w, ok := p.(WatchAware); ok && r.watchActive {
+			w.SetFileWatchActive(true)
+		}
 		r.dynamic = append(r.dynamic, p)
 	}
 }
@@ -173,15 +190,39 @@ func (r *Registry) SetWorkspaceRoot(root string) {
 	}
 }
 
+// InvalidateTree forwards a changed file's path to every TreeInvalidator
+// renderer so tree-level caches drop before the next render.
+func (r *Registry) InvalidateTree(path string) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, p := range append(append([]Renderer(nil), r.providers...), r.dynamic...) {
+		if t, ok := p.(TreeInvalidator); ok {
+			t.InvalidateTree(path)
+		}
+	}
+}
+
+// SetFileWatchActive forwards watch activation to every WatchAware renderer
+// and retains it for renderers built later.
+func (r *Registry) SetFileWatchActive(active bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.watchActive = active
+	for _, p := range append(append([]Renderer(nil), r.providers...), r.dynamic...) {
+		if w, ok := p.(WatchAware); ok {
+			w.SetFileWatchActive(active)
+		}
+	}
+}
+
 func (r *Registry) All() []Renderer {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return append(append([]Renderer(nil), r.providers...), r.dynamic...)
 }
 
-func AnalyzeDocument(uri, path, text string) *SourceDocument {
-	parsed := yamlast.Parse([]byte(text))
-	if parsed.File == nil || len(parsed.File.Docs) == 0 {
+func AnalyzeDocument(uri, path string, parsed *yamlast.Parsed) *SourceDocument {
+	if parsed == nil || parsed.File == nil || len(parsed.File.Docs) == 0 {
 		return nil
 	}
 	doc := parsed.File.Docs[0]
@@ -196,7 +237,7 @@ func AnalyzeDocument(uri, path, text string) *SourceDocument {
 	return &SourceDocument{
 		URI:      uri,
 		Path:     path,
-		Text:     text,
+		Text:     parsed.Text,
 		AST:      parsed.File,
 		Kind:     head.Kind,
 		APIGroup: group + versionSep(group, version),

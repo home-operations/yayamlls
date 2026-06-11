@@ -328,10 +328,13 @@ bar: also-bad
 
 ## Capabilities
 
-`textDocument/`: diagnostics, completion, hover, foldingRange,
+`textDocument/`: diagnostics, completion (trigger characters `:`, ` `, `-`;
+snippet expansion when the client supports it), hover, foldingRange,
 documentLink, documentSymbol, codeAction (enum + suppress quick-fix), codeLens.
 
-`workspace/`: didChangeConfiguration, didChangeWorkspaceFolders, executeCommand.
+`workspace/`: didChangeConfiguration, didChangeWorkspaceFolders,
+didChangeWatchedFiles (config hot-reload + render cache invalidation),
+executeCommand.
 
 ## Commands
 

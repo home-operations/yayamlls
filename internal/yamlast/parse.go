@@ -19,18 +19,25 @@ func Parse(b []byte) *Parsed {
 	return &Parsed{File: f, Err: err, Text: string(b)}
 }
 
-// ParseForCursor is the lenient variant used by completion and hover:
-// when the strict parse fails, the cursor line is blanked out and the
-// document is reparsed so completion still has the AST above the cursor.
-func ParseForCursor(text string, cursorLine int) *Parsed {
-	if p := Parse([]byte(text)); p.Err == nil {
+// ForCursor returns p unchanged when it parsed cleanly. On a syntax error
+// the cursor line is blanked out and the document is reparsed so completion
+// still has the AST above the cursor. The fallback depends on the cursor
+// line, so it is recomputed per call and must never be written back to a
+// cache; note its Text holds the blanked source, not the original.
+func ForCursor(p *Parsed, cursorLine int) *Parsed {
+	if p == nil || p.Err == nil {
 		return p
 	}
-	lines := []byte(text)
-	if patched, ok := blankLine([]byte(text), cursorLine); ok {
+	lines := []byte(p.Text)
+	if patched, ok := blankLine([]byte(p.Text), cursorLine); ok {
 		lines = patched
 	}
 	return Parse(lines)
+}
+
+// ParseForCursor is the lenient variant used by completion and hover.
+func ParseForCursor(text string, cursorLine int) *Parsed {
+	return ForCursor(Parse([]byte(text)), cursorLine)
 }
 
 func blankLine(text []byte, target int) ([]byte, bool) {

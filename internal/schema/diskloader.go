@@ -33,6 +33,12 @@ func defaultCacheDir() string {
 // block the fetch (and the schema lookup waiting on it) indefinitely.
 const fetchTimeout = 30 * time.Second
 
+// freshTTL is how long a cached schema body is served without any network
+// round-trip. Within it a cold start (CLI run, editor restart) costs zero
+// fetches; past it the body is revalidated with its ETag, so an unchanged
+// schema still transfers nothing.
+const freshTTL = time.Hour
+
 // diskLoader is a jsonschema.URLLoader for http(s) schema URLs that caches
 // bodies on disk and revalidates them with ETags.
 type diskLoader struct {
@@ -64,6 +70,10 @@ func (l *diskLoader) loadBytes(url string) ([]byte, error) {
 	cachedBody, _ := os.ReadFile(bodyPath)
 	meta, _ := readMeta(metaPath)
 
+	if len(cachedBody) > 0 && time.Since(meta.Fetched) < freshTTL {
+		return cachedBody, nil
+	}
+
 	resp, err := l.conditionalGET(url, meta.ETag)
 	if err != nil {
 		// Offline: prefer stale cache over failing the whole document.
@@ -77,6 +87,9 @@ func (l *diskLoader) loadBytes(url string) ([]byte, error) {
 	switch resp.StatusCode {
 	case http.StatusNotModified:
 		if len(cachedBody) > 0 {
+			// Restart the freshness window: the origin just confirmed the
+			// cached body is current.
+			_ = writeMeta(metaPath, cacheMeta{ETag: meta.ETag, Fetched: time.Now()})
 			return cachedBody, nil
 		}
 		return l.plainGET(url)

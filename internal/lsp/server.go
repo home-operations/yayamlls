@@ -17,6 +17,11 @@ import (
 
 const lsName = "yayamlls"
 
+// defaultLintDebounce coalesces a burst of didChange notifications into one
+// diagnostics pass. It is intentionally shorter than the render debounce so
+// schema feedback still feels immediate.
+const defaultLintDebounce = 200 * time.Millisecond
+
 type Server struct {
 	docs     *document.Store
 	schemas  *schema.Store
@@ -43,6 +48,16 @@ type Server struct {
 	// editor; otherwise they return it as a payload for the bundled extensions.
 	clientShowDoc bool
 
+	// clientWatchFiles records whether the client supports dynamic
+	// registration for workspace/didChangeWatchedFiles (the spec offers no
+	// static form). When set, initialized registers watchers and renderers
+	// switch to event-driven tree invalidation.
+	clientWatchFiles bool
+
+	// clientSnippets records whether the client supports snippet completion
+	// items (tab stops and placeholders in insert text).
+	clientSnippets bool
+
 	// pendingShow holds show commands that arrived before the render was ready,
 	// keyed by URI; Notify fires the deferred window/showDocument once it lands.
 	showMu      sync.Mutex
@@ -52,6 +67,13 @@ type Server struct {
 	// per-URI counter, and a goroutine drops its result if a newer one started.
 	pubMu  sync.Mutex
 	pubSeq map[string]uint64
+
+	// lintTimers debounces didChange diagnostics per URI so typing doesn't
+	// trigger a parse+validate per keystroke. didOpen and config changes
+	// publish immediately. lintDebounce is set once in New (tests lower it).
+	lintMu       sync.Mutex
+	lintTimers   map[string]*time.Timer
+	lintDebounce time.Duration
 
 	// settings is the effective merge; workspaceSettings (from .yayamlls.yaml)
 	// is the lowest-precedence layer and overrides holds initializationOptions
@@ -79,6 +101,8 @@ func New(version string, registry *render.Registry) *Server {
 		renderedBaseline: make(map[string][]byte),
 		pubSeq:           make(map[string]uint64),
 		pendingShow:      make(map[string]string),
+		lintTimers:       make(map[string]*time.Timer),
+		lintDebounce:     defaultLintDebounce,
 		version:          version,
 	}
 	s.pipeline = render.NewPipeline(registry, s)
@@ -104,6 +128,7 @@ func New(version string, registry *render.Registry) *Server {
 
 		WorkspaceDidChangeConfiguration:    s.didChangeConfig,
 		WorkspaceDidChangeWorkspaceFolders: s.didChangeWorkspaceFolders,
+		WorkspaceDidChangeWatchedFiles:     s.didChangeWatchedFiles,
 		WorkspaceExecuteCommand:            s.executeCommand,
 	}
 	return s
@@ -132,6 +157,11 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	caps.CodeActionProvider = &protocol.CodeActionOptions{
 		CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 	}
+	// ":" fires value completion as soon as a key's colon is typed, " " in
+	// value/sequence position, "-" when starting a sequence item.
+	caps.CompletionProvider = &protocol.CompletionOptions{
+		TriggerCharacters: []string{":", " ", "-"},
+	}
 	// glsp wires the WorkspaceDidChangeWorkspaceFolders handler but doesn't set
 	// this capability, and clients withhold the notification until it's declared.
 	caps.Workspace = &protocol.ServerCapabilitiesWorkspace{
@@ -144,6 +174,14 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	if w := params.Capabilities.Window; w != nil && w.ShowDocument != nil && w.ShowDocument.Support {
 		s.clientShowDoc = true
 	}
+	if td := params.Capabilities.TextDocument; td != nil && td.Completion != nil &&
+		td.Completion.CompletionItem != nil && td.Completion.CompletionItem.SnippetSupport != nil {
+		s.clientSnippets = *td.Completion.CompletionItem.SnippetSupport
+	}
+	if w := params.Capabilities.Workspace; w != nil && w.DidChangeWatchedFiles != nil &&
+		w.DidChangeWatchedFiles.DynamicRegistration != nil && *w.DidChangeWatchedFiles.DynamicRegistration {
+		s.clientWatchFiles = true
+	}
 
 	root := pickWorkspaceRoot(params)
 	var (
@@ -151,7 +189,6 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 		err error
 	)
 	if root != "" {
-		s.workspaceRoot = root
 		ws, err = config.LoadFromWorkspace(root)
 		if err != nil {
 			notifyShowMessage(ctx, protocol.MessageTypeWarning,
@@ -159,6 +196,9 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 		}
 	}
 	s.settingsMu.Lock()
+	if root != "" {
+		s.workspaceRoot = root
+	}
 	s.workspaceSettings = ws
 	if init := settingsFromInitOptions(params.InitializationOptions); init != nil {
 		s.overrides = *init
@@ -214,9 +254,10 @@ func (s *Server) applyLayers() {
 	s.settingsMu.Lock()
 	effective := config.Merge(s.workspaceSettings, s.overrides)
 	s.settings = effective
+	root := s.workspaceRoot
 	s.settingsMu.Unlock()
 	s.resolver.SetSettings(effective)
-	s.renderer.SetWorkspaceRoot(uriToPath(s.workspaceRoot))
+	s.renderer.SetWorkspaceRoot(uriToPath(root))
 	s.renderer.Configure(effective.Renderers)
 	debounce := render.DefaultDebounce
 	if ms := effective.RenderDebounceMs; ms != nil && *ms > 0 {
@@ -261,6 +302,37 @@ func notifyShowMessage(ctx *glsp.Context, level protocol.MessageType, msg string
 }
 
 func (s *Server) initialized(ctx *glsp.Context, params *protocol.InitializedParams) error {
+	s.captureNotify(ctx)
+	if !s.clientWatchFiles {
+		return nil
+	}
+	// Optimistic: a client advertising dynamicRegistration honors the
+	// registration. Non-watching clients keep the fingerprint fallback.
+	s.renderer.SetFileWatchActive(true)
+	call := s.currentCall()
+	if call == nil {
+		return nil
+	}
+	// glsp dispatches on the jsonrpc2 read loop, so a blocking Call from
+	// inside a handler would deadlock waiting for its own response; register
+	// asynchronously (same pattern as showInEditor).
+	go func() {
+		var result any
+		call(protocol.ServerClientRegisterCapability, protocol.RegistrationParams{
+			Registrations: []protocol.Registration{{
+				ID:     "yayamlls.watchedFiles",
+				Method: protocol.MethodWorkspaceDidChangeWatchedFiles,
+				RegisterOptions: protocol.DidChangeWatchedFilesRegistrationOptions{
+					Watchers: []protocol.FileSystemWatcher{
+						{GlobPattern: "**/*.{yaml,yml}"},
+						// Separate watcher: `*` does not match a leading dot
+						// in every client's glob implementation.
+						{GlobPattern: "**/.{yayamlls,yamlls}.yaml"},
+					},
+				},
+			}},
+		}, &result)
+	}()
 	return nil
 }
 
@@ -274,6 +346,12 @@ func (s *Server) setTrace(ctx *glsp.Context, params *protocol.SetTraceParams) er
 	return nil
 }
 
+// cancelRequest is deliberately a no-op. glsp dispatches every message
+// synchronously on the jsonrpc2 read goroutine and exposes no request ID to
+// handlers, so by the time a $/cancelRequest is read off the wire the request
+// it targets has always completed. The useful equivalents exist elsewhere:
+// the render pipeline supersedes-and-cancels on newer content, pubSeq drops
+// superseded diagnostics, and renders carry a timeout.
 func (s *Server) cancelRequest(ctx *glsp.Context, params *protocol.CancelParams) error {
 	return nil
 }
@@ -357,7 +435,7 @@ func (s *Server) schedulePublish(d *document.Document) {
 
 	go func() {
 		// nil marshals to `null`; clients keep stale diagnostics on `null`.
-		diags := lint.Document(d.Text, uriToPath(uri), s.resolver, s.schemas, opts)
+		diags := lint.Document(d.Parsed(), uriToPath(uri), s.resolver, s.schemas, opts)
 		diags = append(diags, s.renderedDiagnosticsFor(uri)...)
 		diags = diagnostics.ParseSuppressions(d.Text).Filter(diags)
 
@@ -386,6 +464,37 @@ func (s *Server) currentCall() glsp.CallFunc {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 	return s.connCall
+}
+
+// debouncePublish coalesces a burst of didChange notifications into one
+// diagnostics pass. The timer re-reads the store when it fires, so it always
+// lints the newest text, and a close in the window finds no document and
+// publishes nothing.
+func (s *Server) debouncePublish(uri string) {
+	s.lintMu.Lock()
+	if t, ok := s.lintTimers[uri]; ok {
+		t.Stop()
+	}
+	s.lintTimers[uri] = time.AfterFunc(s.lintDebounce, func() {
+		s.lintMu.Lock()
+		delete(s.lintTimers, uri)
+		s.lintMu.Unlock()
+		if d, ok := s.docs.Get(uri); ok {
+			s.publishDiagnostics(nil, d)
+		}
+	})
+	s.lintMu.Unlock()
+}
+
+// cancelDebounce drops a pending debounced publish, called from didClose so
+// a timer can't fire for a document that is no longer open.
+func (s *Server) cancelDebounce(uri string) {
+	s.lintMu.Lock()
+	if t, ok := s.lintTimers[uri]; ok {
+		t.Stop()
+		delete(s.lintTimers, uri)
+	}
+	s.lintMu.Unlock()
 }
 
 // forgetPublish drops a closed document's counter so an in-flight publish

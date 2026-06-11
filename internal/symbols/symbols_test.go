@@ -3,6 +3,8 @@ package symbols
 import (
 	"testing"
 
+	"github.com/home-operations/yayamlls/internal/yamlast"
+
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -17,7 +19,7 @@ spec:
     - name: app
       image: nginx
 `
-	got := Outline(text)
+	got := Outline(yamlast.Parse([]byte(text)))
 	if len(got) != 1 {
 		t.Fatalf("expected 1 doc symbol, got %d", len(got))
 	}
@@ -31,7 +33,7 @@ spec:
 }
 
 func TestOutline_NonKubernetesDoc(t *testing.T) {
-	got := Outline("name: Alice\nage: 30\n")
+	got := Outline(yamlast.Parse([]byte("name: Alice\nage: 30\n")))
 	if len(got) != 1 {
 		t.Fatalf("expected 1 doc symbol, got %d", len(got))
 	}
