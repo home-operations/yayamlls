@@ -207,6 +207,95 @@ data:
 	}
 }
 
+// With file watching active the tree cache is keyed by invalidation
+// generation: the per-render fingerprint walk is skipped (an unannounced
+// disk edit stays invisible), out-of-root invalidations keep the cache, and
+// an in-root invalidation triggers a rebuild.
+func TestFlate_EventModeInvalidatesByGenerationOnly(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	r.SetFileWatchActive(true)
+
+	out, err := r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("first render: %v", err)
+	}
+	if !strings.Contains(string(out.Raw), "greeting: hi") {
+		t.Fatalf("unexpected first render: %s", out.Raw)
+	}
+
+	writeFile(t, filepath.Join(k8s, "apps-a", "cm.yaml"), `---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: cm-apps-a, namespace: default}
+data:
+  greeting: hello again
+`)
+
+	// No invalidation event yet: the edit must not be picked up (proves the
+	// fingerprint walk is skipped in event mode).
+	out, err = r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("render after silent edit: %v", err)
+	}
+	if strings.Contains(string(out.Raw), "hello again") {
+		t.Fatal("event mode picked up an unannounced edit; fingerprinting not skipped")
+	}
+
+	// An event outside the build root must not invalidate either.
+	r.InvalidateTree(filepath.Join(t.TempDir(), "elsewhere.yaml"))
+	out, err = r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("render after out-of-root invalidation: %v", err)
+	}
+	if strings.Contains(string(out.Raw), "hello again") {
+		t.Fatal("out-of-root invalidation rebuilt the tree")
+	}
+
+	r.InvalidateTree(filepath.Join(k8s, "apps-a", "cm.yaml"))
+	out, err = r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("render after invalidation: %v", err)
+	}
+	if !strings.Contains(string(out.Raw), "hello again") {
+		t.Errorf("in-root invalidation not picked up, raw: %s", out.Raw)
+	}
+}
+
+// A timed-out build is negative-cached: other documents fail fast instead of
+// re-spending the timeout, until the next tree change clears it.
+func TestFlate_TimeoutNegativeCachedUntilInvalidated(t *testing.T) {
+	k8s := writeFixture(t)
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	r.SetFileWatchActive(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), -time.Second)
+	defer cancel()
+	if _, err := r.Render(ctx, ksDoc("apps-a")); err == nil {
+		t.Fatal("expected error from timed-out render")
+	}
+
+	// Without the negative cache this render would succeed.
+	if _, err := r.Render(context.Background(), ksDoc("apps-a")); err == nil {
+		t.Fatal("expected cached timeout error, got success")
+	}
+
+	r.InvalidateTree("")
+	out, err := r.Render(context.Background(), ksDoc("apps-a"))
+	if err != nil {
+		t.Fatalf("render after invalidation: %v", err)
+	}
+	if len(out.Manifests) != 1 || out.Manifests[0].Name != "cm-apps-a" {
+		t.Fatalf("expected cm-apps-a after invalidation, got %+v", out.Manifests)
+	}
+}
+
 // A cancelled render must not be cached: the next caller gets a fresh one.
 func TestFlate_CancelledRenderNotCached(t *testing.T) {
 	k8s := writeFixture(t)

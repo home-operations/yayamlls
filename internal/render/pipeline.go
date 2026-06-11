@@ -123,6 +123,16 @@ func (p *Pipeline) Latest(uri, text string) (*RenderedOutput, bool) {
 	return nil, false
 }
 
+// InvalidateAll drops every cached render result, forcing the next Schedule
+// to re-render even unchanged document content. Used when a watched
+// workspace file changes, since renders depend on the on-disk tree. Pending
+// entries are left alone; a subsequent Schedule supersedes them.
+func (p *Pipeline) InvalidateAll() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	clear(p.cache)
+}
+
 // Cancel drops a URI's pending render and cached result. Called when a
 // document closes so neither map retains entries for files no longer open.
 func (p *Pipeline) Cancel(uri string) {

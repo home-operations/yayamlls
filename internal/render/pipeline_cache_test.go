@@ -66,6 +66,40 @@ func TestPipeline_CacheHitSkipsRenderAndNotifiesImmediately(t *testing.T) {
 	}
 }
 
+func TestPipeline_InvalidateAllForcesRerender(t *testing.T) {
+	reg := render.NewRegistry()
+	fr := &fakeRenderer{
+		name:    "fake",
+		matches: true,
+		out:     []byte("apiVersion: v1\nkind: Pod\nmetadata:\n  name: x\n"),
+	}
+	reg.Register(fr)
+	sink := newRecordingSink()
+	p := render.NewPipeline(reg, sink)
+	p.SetDebounce(time.Millisecond)
+
+	doc := &render.SourceDocument{URI: "file:///tmp/x.yaml", Text: "a"}
+	p.Schedule(doc)
+	select {
+	case <-sink.done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first render never delivered")
+	}
+
+	// Identical content would normally replay from the cache; after
+	// InvalidateAll it must render again (the on-disk tree changed).
+	p.InvalidateAll()
+	p.Schedule(doc)
+	select {
+	case <-sink.done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("post-invalidation render never delivered")
+	}
+	if fr.calls != 2 {
+		t.Errorf("expected 2 render calls after InvalidateAll, got %d", fr.calls)
+	}
+}
+
 func TestPipeline_LatestMatchesCurrentTextOnly(t *testing.T) {
 	reg := render.NewRegistry()
 	fr := &fakeRenderer{
