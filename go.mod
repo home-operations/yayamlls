@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/home-operations/flate v0.4.4
+	github.com/home-operations/flate v0.4.5
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
@@ -166,7 +166,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.2 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	helm.sh/helm/v4 v4.2.0 // indirect
+	helm.sh/helm/v4 v4.2.1 // indirect
 	k8s.io/api v0.36.1 // indirect
 	k8s.io/apiextensions-apiserver v0.36.1 // indirect
 	k8s.io/apimachinery v0.36.1 // indirect
