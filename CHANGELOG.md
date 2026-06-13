@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.3](https://github.com/home-operations/yayamlls/compare/0.1.2...0.1.3) (2026-06-13)
+
+
+### Bug Fixes
+
+* **deps:** update dependency vscode (1.124.0 → 1.124.2) ([#56](https://github.com/home-operations/yayamlls/issues/56)) ([29265f0](https://github.com/home-operations/yayamlls/commit/29265f0fa95ca2edc4bc5f1c8a16963b14e11dbd))
+* **deps:** update module github.com/home-operations/flate (v0.4.1 → v0.4.2) ([#50](https://github.com/home-operations/yayamlls/issues/50)) ([b40ec03](https://github.com/home-operations/yayamlls/commit/b40ec039bfb1b44452bbb2195674455dbe981dc6))
+* **deps:** update module github.com/home-operations/flate (v0.4.2 → v0.4.4) ([#55](https://github.com/home-operations/yayamlls/issues/55)) ([fe1da96](https://github.com/home-operations/yayamlls/commit/fe1da96d0e6cce4d816ca656e4d9e9ac99f793ce))
+* **deps:** update module github.com/home-operations/flate (v0.4.4 → v0.4.5) ([#57](https://github.com/home-operations/yayamlls/issues/57)) ([bf1fbd0](https://github.com/home-operations/yayamlls/commit/bf1fbd0e0190a2fe6a91d3694562d735b20a1b0c))
+* **zed:** bump extension version to 0.1.2 and track it in release-please ([#54](https://github.com/home-operations/yayamlls/issues/54)) ([38e1a63](https://github.com/home-operations/yayamlls/commit/38e1a632b304ff923c0470ea60dda3ca340a6d9f))
+
 ## [0.1.2](https://github.com/home-operations/yayamlls/compare/0.1.1...0.1.2) (2026-06-11)
 
 
