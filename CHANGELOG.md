@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/home-operations/yayamlls/compare/0.1.3...0.1.4) (2026-06-14)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/home-operations/flate (v0.4.5 → v0.4.6) ([#58](https://github.com/home-operations/yayamlls/issues/58)) ([102b5bf](https://github.com/home-operations/yayamlls/commit/102b5bf74be733c61b1383c30bee7a8896c95595))
+* **folding:** guard nil document body to prevent panic ([09b28ce](https://github.com/home-operations/yayamlls/commit/09b28cef7a4a4a82cc49cd49010385925913c754))
+
 ## [0.1.3](https://github.com/home-operations/yayamlls/compare/0.1.2...0.1.3) (2026-06-13)
 
 
