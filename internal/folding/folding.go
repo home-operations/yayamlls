@@ -13,6 +13,9 @@ func Ranges(parsed *yamlast.Parsed) []protocol.FoldingRange {
 	}
 	var out []protocol.FoldingRange
 	for _, doc := range parsed.File.Docs {
+		if doc == nil || doc.Body == nil {
+			continue
+		}
 		ast.Walk(visitorFn(func(n ast.Node) {
 			switch n.(type) {
 			case *ast.DocumentNode, *ast.MappingNode, *ast.SequenceNode:

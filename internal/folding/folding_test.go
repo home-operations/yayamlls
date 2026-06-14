@@ -40,3 +40,12 @@ func TestRanges_NoRangeForSingleLineDoc(t *testing.T) {
 		t.Errorf("expected zero ranges for single-line doc, got %+v", got)
 	}
 }
+
+func TestRanges_EmptyAndCommentOnlyDocs(t *testing.T) {
+	// Empty docs have a nil Body; walking them must not panic.
+	for _, text := range []string{"", "# just a comment\n", "---\n# c\n---\n"} {
+		if got := Ranges(yamlast.Parse([]byte(text))); len(got) != 0 {
+			t.Errorf("expected zero ranges for %q, got %+v", text, got)
+		}
+	}
+}
