@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/home-operations/flate v0.4.6
+	github.com/home-operations/flate v0.4.7
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
