@@ -129,7 +129,7 @@ age: "thirty"
 		t.Fatalf("schema compile: %v", err)
 	}
 
-	diags := diagnostics.Validate(parsed, sch)
+	diags := diagnostics.Validate(parsed, sch, diagnostics.Options{})
 	if len(diags) == 0 {
 		t.Fatalf("expected at least one diagnostic, got none")
 	}
@@ -154,7 +154,7 @@ func TestValidate_ParseErrorAnchoredAtPosition(t *testing.T) {
 	if parsed.Err == nil {
 		t.Fatalf("expected a parse error")
 	}
-	diags := diagnostics.Validate(parsed, nil)
+	diags := diagnostics.Validate(parsed, nil, diagnostics.Options{})
 	if len(diags) != 1 {
 		t.Fatalf("expected one parse diagnostic, got %d: %+v", len(diags), diags)
 	}
@@ -181,7 +181,7 @@ age: 30
 	if err != nil {
 		t.Fatalf("schema compile: %v", err)
 	}
-	diags := diagnostics.Validate(parsed, sch)
+	diags := diagnostics.Validate(parsed, sch, diagnostics.Options{})
 	if len(diags) != 0 {
 		t.Errorf("expected zero diagnostics, got: %+v", diags)
 	}

@@ -315,6 +315,9 @@ func (s *Server) publishDiagnostics(ctx *glsp.Context, d *document.Document) {
 }
 
 func (s *Server) clearDiagnostics(ctx *glsp.Context, uri string) {
+	if ctx == nil || ctx.Notify == nil {
+		return
+	}
 	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
 		URI:         uri,
 		Diagnostics: []protocol.Diagnostic{},
