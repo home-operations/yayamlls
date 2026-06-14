@@ -298,7 +298,11 @@ func fingerprintTree(root string) (string, error) {
 	h := sha256.New()
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			// Skip inaccessible entries (deleted mid-walk, broken symlinks,
+			// permission errors) rather than aborting the whole fingerprint.
+			// A missed invalidation for one file is preferable to surfacing
+			// render errors on every open document.
+			return nil
 		}
 		if d.IsDir() {
 			if d.Name() == ".git" {
@@ -308,7 +312,7 @@ func fingerprintTree(root string) (string, error) {
 		}
 		info, err := d.Info()
 		if err != nil {
-			return err
+			return nil
 		}
 		// hash.Hash writes never fail.
 		_, _ = fmt.Fprintf(h, "%s\x00%d\x00%d\n", path, info.Size(), info.ModTime().UnixNano())

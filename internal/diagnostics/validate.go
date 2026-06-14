@@ -28,7 +28,7 @@ type Options struct {
 	CustomTags []string
 }
 
-func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema) []protocol.Diagnostic {
+func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema, opts Options) []protocol.Diagnostic {
 	if parsed == nil {
 		return nil
 	}
@@ -40,7 +40,7 @@ func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema) []protocol.Diagnos
 		return out
 	}
 	for _, doc := range parsed.Docs() {
-		out = append(out, validateDoc(doc, sch, parsed.Text, Options{})...)
+		out = append(out, validateDoc(doc, sch, parsed.Text, opts)...)
 	}
 	return out
 }
