@@ -244,11 +244,16 @@ func (s *Server) reloadWorkspaceConfig(ctx *glsp.Context) {
 	s.settingsMu.Lock()
 	root := s.workspaceRoot
 	s.settingsMu.Unlock()
-	var ws config.Settings
-	if loaded, err := config.LoadFromWorkspace(root); err == nil {
-		ws = loaded
+	loaded, err := config.LoadFromWorkspace(root)
+	if err != nil {
+		// A parse error (e.g. a typo saved into .yayamlls.yaml) must not
+		// silently wipe the working config. Keep the prior workspace layer and
+		// surface the failure, mirroring the initialize path.
+		notifyShowMessage(ctx, protocol.MessageTypeWarning,
+			"yayamlls: failed to reload .yayamlls.yaml (keeping previous settings): "+err.Error())
+		return
 	}
-	s.setWorkspaceLayer(ws)
+	s.setWorkspaceLayer(loaded)
 	for _, uri := range s.docs.AllURIs() {
 		if d, ok := s.docs.Get(uri); ok {
 			s.publishDiagnostics(ctx, d)
