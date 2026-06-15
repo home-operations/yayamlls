@@ -2,6 +2,8 @@ package lsp
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -252,13 +254,30 @@ func settingsFromInitOptions(opts any) *config.Settings {
 // resolver and renderers.
 func (s *Server) applyLayers() {
 	s.settingsMu.Lock()
-	effective := config.Merge(s.workspaceSettings, s.overrides)
+	ws := s.workspaceSettings
+	ov := s.overrides
+	effective := config.Merge(ws, ov)
 	s.settings = effective
 	root := s.workspaceRoot
 	s.settingsMu.Unlock()
 	s.resolver.SetSettings(effective)
+	s.schemas.SetTrustRoot(uriToPath(root))
 	s.renderer.SetWorkspaceRoot(uriToPath(root))
-	s.renderer.Configure(effective.Renderers)
+	// Subprocess renderer commands from an untrusted workspace .yayamlls.yaml
+	// are dropped here (config.TrustedRenderers); only command-less entries and
+	// the trusted client layer reach the registry.
+	renderers, dropped := config.TrustedRenderers(ws, ov)
+	if len(dropped) > 0 {
+		s.warn(fmt.Sprintf("yayamlls: ignored workspace renderer command(s) %s from .yayamlls.yaml for safety; "+
+			"declare subprocess renderers in your editor/global config instead", strings.Join(dropped, ", ")))
+	}
+	if errs := s.renderer.Configure(renderers); len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		s.warn("yayamlls: renderer config rejected: " + strings.Join(msgs, "; "))
+	}
 	debounce := render.DefaultDebounce
 	if ms := effective.RenderDebounceMs; ms != nil && *ms > 0 {
 		debounce = time.Duration(*ms) * time.Millisecond
@@ -289,6 +308,19 @@ func (s *Server) applySettingsRaw(raw json.RawMessage) {
 	s.overrides = config.Merge(s.overrides, settings)
 	s.settingsMu.Unlock()
 	s.applyLayers()
+}
+
+// warn sends a best-effort window/showMessage warning over the captured
+// connection. It is a no-op before the connection's notify func has been
+// captured (e.g. during initialize), so callers use it for non-fatal config
+// problems that also surface on a later reload.
+func (s *Server) warn(msg string) {
+	if n := s.currentNotify(); n != nil {
+		n(protocol.ServerWindowShowMessage, protocol.ShowMessageParams{
+			Type:    protocol.MessageTypeWarning,
+			Message: msg,
+		})
+	}
 }
 
 func notifyShowMessage(ctx *glsp.Context, level protocol.MessageType, msg string) {
@@ -325,6 +357,13 @@ func (s *Server) initialized(ctx *glsp.Context, params *protocol.InitializedPara
 				RegisterOptions: protocol.DidChangeWatchedFilesRegistrationOptions{
 					Watchers: []protocol.FileSystemWatcher{
 						{GlobPattern: "**/*.{yaml,yml}"},
+						// Catch non-YAML inputs that renderers depend on:
+						// in-repo Helm chart .tpl files, kustomize
+						// configMapGenerator inputs, etc. Without this, a
+						// file-system change outside the YAML globs is
+						// invisible to the event-driven invalidation path
+						// and the renderer replays stale output.
+						{GlobPattern: "**/*.{tpl,conf,json,toml,env}"},
 						// Separate watcher: `*` does not match a leading dot
 						// in every client's glob implementation.
 						{GlobPattern: "**/.{yayamlls,yamlls}.yaml"},
@@ -497,11 +536,13 @@ func (s *Server) cancelDebounce(uri string) {
 	s.lintMu.Unlock()
 }
 
-// forgetPublish drops a closed document's counter so an in-flight publish
-// goroutine sees it was superseded and won't resurrect diagnostics.
+// forgetPublish advances a closed document's counter so an in-flight publish
+// goroutine that captured the prior seq can never match again. Deleting the
+// entry would let a close+reopen of the same URI restart the sequence and
+// resurrect diagnostics for the pre-close text.
 func (s *Server) forgetPublish(uri string) {
 	s.pubMu.Lock()
-	delete(s.pubSeq, uri)
+	s.pubSeq[uri]++
 	s.pubMu.Unlock()
 }
 
@@ -526,6 +567,15 @@ func (s *Server) renderedBaselineFor(uri string) []byte {
 	s.rendMu.Lock()
 	defer s.rendMu.Unlock()
 	return s.renderedBaseline[uri]
+}
+
+// renderedRawAndBaseline returns raw and baseline for uri under a single
+// rendMu acquisition, so a concurrent Notify can't write between the two
+// reads and produce a diff against a one-generation-stale raw.
+func (s *Server) renderedRawAndBaseline(uri string) (raw, baseline []byte) {
+	s.rendMu.Lock()
+	defer s.rendMu.Unlock()
+	return s.renderedRaw[uri], s.renderedBaseline[uri]
 }
 
 func (s *Server) clearRenderState(uri string) {

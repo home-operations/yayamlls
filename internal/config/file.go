@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	yaml "github.com/goccy/go-yaml"
@@ -142,6 +143,41 @@ func Merge(base, override Settings) Settings {
 		out.CustomTags = unionStrings(out.CustomTags, override.CustomTags)
 	}
 	return out
+}
+
+// TrustedRenderers returns the renderer configs safe to materialise from the
+// given layers. A renderer entry that declares a "command" runs an arbitrary
+// executable, so it is honored only from the trusted override layer (client
+// initializationOptions / didChangeConfiguration) and never from a workspace
+// .yayamlls.yaml: a cloned repo could otherwise ship a config that runs code
+// the moment the editor opens one of its files. Command-less entries (e.g. the
+// built-in flate renderer's config) are accepted from either layer.
+//
+// dropped lists, sorted, the workspace entries rejected for declaring a
+// command, so the caller can warn that their config was ignored.
+func TrustedRenderers(workspace, overrides Settings) (configs map[string]json.RawMessage, dropped []string) {
+	configs = make(map[string]json.RawMessage, len(workspace.Renderers)+len(overrides.Renderers))
+	for name, raw := range workspace.Renderers {
+		if rendererDeclaresCommand(raw) {
+			dropped = append(dropped, name)
+			continue
+		}
+		configs[name] = raw
+	}
+	// Override entries are trusted and win on a name collision.
+	maps.Copy(configs, overrides.Renderers)
+	sort.Strings(dropped)
+	return configs, dropped
+}
+
+func rendererDeclaresCommand(raw json.RawMessage) bool {
+	var probe struct {
+		Command []string `json:"command"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return false
+	}
+	return len(probe.Command) > 0
 }
 
 // unionStrings appends override values to base, dropping duplicates and

@@ -3,12 +3,14 @@ package render
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
 	yaml "github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
 )
 
@@ -46,14 +48,20 @@ func ParseManifests(stdout []byte) ([]RenderedManifest, error) {
 		if d.Body == nil {
 			continue
 		}
+		gvk, ok := schema.DetectGVK(d.Body)
+		if !ok {
+			continue
+		}
+		// The metadata name is the only non-GVK header the rendered output
+		// needs to carry; decode it directly from the body to avoid yet
+		// another full-decode pass.
 		head, ok := decodeHead(d.Body)
 		if !ok {
 			continue
 		}
-		group, version := splitAPIVersion(head.APIVersion)
 		out = append(out, RenderedManifest{
 			AST:  d,
-			GVK:  GVK{Group: group, Version: version, Kind: head.Kind},
+			GVK:  gvk,
 			Name: head.Metadata.Name,
 		})
 	}
@@ -140,24 +148,29 @@ func (r *Registry) For(doc *SourceDocument) Renderer {
 
 // Configure applies each config entry: entries naming a compiled-in renderer
 // configure it in place; the rest are rebuilt into the dynamic set via the
-// factory, so removing an entry drops its renderer.
-func (r *Registry) Configure(configs map[string]json.RawMessage) {
+// factory, so removing an entry drops its renderer. It returns one error per
+// renderer whose config was rejected, so a malformed entry surfaces to the
+// user instead of leaving the renderer silently at its prior state.
+func (r *Registry) Configure(configs map[string]json.RawMessage) []error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	var errs []error
 	known := make(map[string]bool, len(r.providers))
 	for _, p := range r.providers {
 		known[p.Name()] = true
 		if raw, ok := configs[p.Name()]; ok {
 			if c, ok := p.(Configurable); ok {
-				_ = c.Configure(raw)
+				if err := c.Configure(raw); err != nil {
+					errs = append(errs, fmt.Errorf("renderer %q: %w", p.Name(), err))
+				}
 			}
 		}
 	}
 
 	r.dynamic = r.dynamic[:0]
 	if r.factory == nil {
-		return
+		return errs
 	}
 	for name, raw := range configs {
 		if known[name] {
@@ -175,6 +188,7 @@ func (r *Registry) Configure(configs map[string]json.RawMessage) {
 		}
 		r.dynamic = append(r.dynamic, p)
 	}
+	return errs
 }
 
 // SetWorkspaceRoot forwards a filesystem path (not a URI) to every
@@ -233,37 +247,23 @@ func AnalyzeDocument(uri, path string, parsed *yamlast.Parsed) *SourceDocument {
 	if !ok {
 		return nil
 	}
-	group, version := splitAPIVersion(head.APIVersion)
+	gvk, ok := schema.DetectGVK(doc.Body)
+	if !ok {
+		return nil
+	}
+	apiGroup := gvk.Version
+	if gvk.Group != "" {
+		apiGroup = gvk.Group + "/" + gvk.Version
+	}
 	return &SourceDocument{
 		URI:      uri,
 		Path:     path,
 		Text:     parsed.Text,
 		AST:      parsed.File,
 		Kind:     head.Kind,
-		APIGroup: group + versionSep(group, version),
+		APIGroup: apiGroup,
 		Name:     head.Metadata.Name,
 	}
-}
-
-func versionSep(group, version string) string {
-	if group == "" {
-		return version
-	}
-	if version == "" {
-		return ""
-	}
-	return "/" + version
-}
-
-func splitAPIVersion(v string) (group, version string) {
-	if v == "" {
-		return "", ""
-	}
-	if !strings.Contains(v, "/") {
-		return "", v
-	}
-	g, ver, _ := strings.Cut(v, "/")
-	return g, ver
 }
 
 // MatchesKind matches doc.Kind exactly and doc.APIGroup on a group boundary

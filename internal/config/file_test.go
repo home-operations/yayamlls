@@ -161,3 +161,68 @@ func TestMerge_CarriesRenderTimeout(t *testing.T) {
 		t.Errorf("base renderTimeoutMs cleared by empty override: %+v", keep.RenderTimeoutMs)
 	}
 }
+
+func rawRenderer(t *testing.T, kind, command string) json.RawMessage {
+	t.Helper()
+	m := map[string]any{"match": map[string]string{"kind": kind}}
+	if command != "" {
+		m["command"] = []string{command, "build", "{dir}"}
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal renderer: %v", err)
+	}
+	return b
+}
+
+func TestTrustedRenderers_DropsWorkspaceCommands(t *testing.T) {
+	workspace := Settings{Renderers: map[string]json.RawMessage{
+		// An untrusted repo .yayamlls.yaml shipping an arbitrary command.
+		"evil": rawRenderer(t, "Kustomization", "/bin/sh"),
+		// A command-less workspace entry (e.g. built-in flate tuning) is fine.
+		"flate": json.RawMessage(`{"enabled":false}`),
+	}}
+	overrides := Settings{Renderers: map[string]json.RawMessage{
+		// The trusted client/global layer may declare a subprocess command.
+		"kustomize": rawRenderer(t, "Kustomization", "kustomize"),
+	}}
+
+	configs, dropped := TrustedRenderers(workspace, overrides)
+
+	if _, ok := configs["evil"]; ok {
+		t.Fatal("workspace command renderer must be dropped (RCE guard)")
+	}
+	if _, ok := configs["flate"]; !ok {
+		t.Fatal("command-less workspace renderer should be kept")
+	}
+	if _, ok := configs["kustomize"]; !ok {
+		t.Fatal("trusted override command renderer should be kept")
+	}
+	if !slices.Equal(dropped, []string{"evil"}) {
+		t.Fatalf("dropped = %v, want [evil]", dropped)
+	}
+}
+
+func TestTrustedRenderers_OverrideWinsOnCollision(t *testing.T) {
+	// A workspace entry must not be able to shadow a trusted override entry
+	// of the same name, nor sneak a command in under it.
+	workspace := Settings{Renderers: map[string]json.RawMessage{
+		"kustomize": rawRenderer(t, "Kustomization", "/bin/sh"),
+	}}
+	overrides := Settings{Renderers: map[string]json.RawMessage{
+		"kustomize": rawRenderer(t, "Kustomization", "kustomize"),
+	}}
+	configs, dropped := TrustedRenderers(workspace, overrides)
+	if !slices.Equal(dropped, []string{"kustomize"}) {
+		t.Fatalf("dropped = %v, want [kustomize]", dropped)
+	}
+	var probe struct {
+		Command []string `json:"command"`
+	}
+	if err := json.Unmarshal(configs["kustomize"], &probe); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(probe.Command) == 0 || probe.Command[0] != "kustomize" {
+		t.Fatalf("override entry should win, got command %v", probe.Command)
+	}
+}
