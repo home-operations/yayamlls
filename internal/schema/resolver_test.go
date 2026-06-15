@@ -51,3 +51,23 @@ func TestResolver_K8sURLGatedByEnabled(t *testing.T) {
 		t.Errorf("expected empty when kubernetes.enabled is false, got %q", got)
 	}
 }
+
+func TestMatchSettings_DeterministicMostSpecific(t *testing.T) {
+	schemas := map[string][]string{
+		"./a.json": {"**/*.yaml"},
+		"./b.json": {"k8s/**/*.yaml"},
+		"./c.json": {"**/app.yaml"},
+	}
+	// Overlapping globs from three refs all match this path; the narrowest
+	// (k8s-anchored) must win, identically on every call.
+	const docPath = "/repo/k8s/app.yaml"
+	first := matchSettings(schemas, docPath)
+	if first != "./b.json" {
+		t.Fatalf("matchSettings = %q, want ./b.json (most specific)", first)
+	}
+	for i := 0; i < 200; i++ {
+		if got := matchSettings(schemas, docPath); got != first {
+			t.Fatalf("nondeterministic: call %d returned %q, want %q", i, got, first)
+		}
+	}
+}

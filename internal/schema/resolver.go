@@ -2,6 +2,7 @@ package schema
 
 import (
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -104,19 +105,49 @@ func matchSettings(schemas map[string][]string, docPath string) string {
 		return ""
 	}
 	norm := strings.ReplaceAll(docPath, string(filepath.Separator), "/")
-	for ref, globs := range schemas {
-		for _, g := range globs {
-			if matchGlob(g, norm) {
-				return ref
-			}
+
+	// Iterate refs in a stable order and pick the most specific matching glob,
+	// so a file matched by globs from several refs always resolves to the same
+	// schema (map iteration order is randomized; a bare "**/*.yaml" must not
+	// shadow a narrower "k8s/**/*.yaml" at random).
+	refs := make([]string, 0, len(schemas))
+	for ref := range schemas {
+		refs = append(refs, ref)
+	}
+	sort.Strings(refs)
+
+	bestRef := ""
+	bestScore := -1
+	for _, ref := range refs {
+		for _, g := range schemas[ref] {
+			matched := matchGlob(g, norm)
 			// Anchored globs like "k8s/**/*.yaml" should also match an
 			// absolute path that ends with the same suffix.
-			if !startsAnchored(g) && matchGlob("**/"+g, norm) {
-				return ref
+			if !matched && !startsAnchored(g) {
+				matched = matchGlob("**/"+g, norm)
+			}
+			if matched {
+				if score := globSpecificity(g); score > bestScore {
+					bestScore = score
+					bestRef = ref
+				}
 			}
 		}
 	}
-	return ""
+	return bestRef
+}
+
+// globSpecificity ranks a matched glob by its count of literal (non-`*`)
+// characters, so a narrow pattern wins over a broad catch-all like
+// "**/*.yaml".
+func globSpecificity(g string) int {
+	n := 0
+	for _, r := range g {
+		if r != '*' {
+			n++
+		}
+	}
+	return n
 }
 
 func startsAnchored(g string) bool {
