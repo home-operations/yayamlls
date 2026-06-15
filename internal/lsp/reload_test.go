@@ -195,3 +195,60 @@ func TestDiagnostics_ReloadOnIncrementalChange(t *testing.T) {
 		t.Fatalf("expected a diagnostic after making age a string, got none")
 	}
 }
+
+// TestConcurrent_NotifyAndClose exercises the cross-goroutine teardown
+// sequence the recent nil/race fixes rely on: the pipeline's Notify write
+// races with didClose's per-URI map cleanup. A passing -race run over the
+// serial paths is not enough; this hammers the concurrent case to lock in
+// the supersede invariants the code documents.
+func TestConcurrent_NotifyAndClose(t *testing.T) {
+	s := New("test", render.NewRegistry())
+	uri := "file:///tmp/race.yaml"
+	// A slow sink drives overlap: Notify blocks long enough for didClose to
+	// land first in the interleaving.
+	rec := &recorder{}
+	ctx := rec.ctx()
+	s.captureNotify(ctx)
+	_ = s.docs.Open(uri, testLangID, 1, "k: v\n")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 200; i++ {
+			s.Notify(uri, &render.RenderedOutput{Raw: []byte("v")}, nil)
+			_ = s.didClose(ctx, &protocol.DidCloseTextDocumentParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			})
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("concurrent Notify+didClose deadlocked")
+	}
+}
+
+// TestPubSeq_MonotonicAcrossCloseReopen locks in the fix for the
+// supersede-counter collision: a pre-close publish goroutine that captured
+// the old seq must NOT match a post-reopen publish with the same numeric
+// value (which would be the case if forgetPublish deleted the counter).
+func TestPubSeq_MonotonicAcrossCloseReopen(t *testing.T) {
+	s := New("test", render.NewRegistry())
+	uri := "file:///tmp/pubseq.yaml"
+
+	s.pubMu.Lock()
+	s.pubSeq[uri] = 5
+	preCloseSeq := s.pubSeq[uri]
+	s.pubMu.Unlock()
+
+	s.forgetPublish(uri) // simulates didClose
+
+	s.pubMu.Lock()
+	postCloseSeq := s.pubSeq[uri]
+	s.pubMu.Unlock()
+
+	if postCloseSeq <= preCloseSeq {
+		t.Fatalf("forgetPublish must advance the counter: pre=%d post=%d (close+reopen would otherwise pass the seq-equality guard and publish stale diagnostics)", preCloseSeq, postCloseSeq)
+	}
+}
