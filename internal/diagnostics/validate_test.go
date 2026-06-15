@@ -153,6 +153,42 @@ func TestValidateDoc_NullableAnyOf_SuppressesWantNullNoise(t *testing.T) {
 	}
 }
 
+// quantitySchema mirrors how Kubernetes schemas $ref the apimachinery Quantity
+// type (a bare string) for resource fields, alongside an ordinary string field.
+const quantitySchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"cpu": {"$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"},
+		"name": {"type": "string"}
+	},
+	"definitions": {
+		"io.k8s.apimachinery.pkg.api.resource.Quantity": {"type": "string"}
+	}
+}`
+
+func TestValidateDoc_Quantity_SuppressesNumericStringNoise(t *testing.T) {
+	sch := compileInlineSchema(t, quantitySchema)
+	body := "cpu: 1\nname: 5\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	for _, d := range diags {
+		if strings.Contains(d.Message, "/cpu") {
+			t.Errorf("expected numeric Quantity to be accepted, got: %s", d.Message)
+		}
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "/name") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the real /name type error to survive; got: %+v", diags)
+	}
+}
+
 func TestValidate_TypeMismatchProducesDiagnostic(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	repo := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))

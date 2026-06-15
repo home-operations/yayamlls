@@ -129,7 +129,7 @@ func WalkLeaves(
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			if nullBranchNoise(e) {
+			if nullBranchNoise(e) || quantityNumberNoise(e) {
 				return
 			}
 			d, skip := build(e)
@@ -157,6 +157,27 @@ func nullBranchNoise(e *jsonschema.ValidationError) bool {
 		return false
 	}
 	return len(k.Want) == 1 && k.Want[0] == "null" && k.Got != "null"
+}
+
+// k8sQuantityDef is the definition name Kubernetes JSON schemas use for the
+// apimachinery Quantity type; it appears as the trailing fragment of the
+// dereferenced SchemaURL on a failing quantity field.
+const k8sQuantityDef = "io.k8s.apimachinery.pkg.api.resource.Quantity"
+
+// quantityNumberNoise reports whether e is a "got number, want string" type
+// mismatch against the Kubernetes Quantity schema. Published k8s schemas type
+// Quantity as a bare string, but the API server's unmarshaler also accepts JSON
+// numbers (e.g. `cpu: 1`), so a numeric quantity is valid and the diagnostic is
+// a false positive.
+func quantityNumberNoise(e *jsonschema.ValidationError) bool {
+	k, ok := e.ErrorKind.(*kind.Type)
+	if !ok {
+		return false
+	}
+	if k.Got != "number" || len(k.Want) != 1 || k.Want[0] != "string" {
+		return false
+	}
+	return strings.HasSuffix(e.SchemaURL, "/"+k8sQuantityDef)
 }
 
 // leafRange anchors a diagnostic on the most specific line. Most errors point
