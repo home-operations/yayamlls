@@ -119,10 +119,10 @@ func flattenValidationError(
 // noisePattern describes a false-positive validation error declaratively.
 // Fields are matched conjunctively; an empty string means "don't care".
 type noisePattern struct {
-	Keyword    string // first element of ErrorKind.KeywordPath()
-	Got        string // desired type.Got value
-	Want       string // desired type.Want[0] value
-	SchemaLike func(string) bool // nil means don't care
+	Keyword    string
+	Got        string
+	Want       string
+	SchemaLike func(string) bool
 }
 
 // matchNoise reports whether e matches any registered noise pattern.
@@ -138,7 +138,7 @@ func matchNoise(patterns []noisePattern, e *jsonschema.ValidationError) bool {
 		if p.Got != "" && k.Got != p.Got {
 			continue
 		}
-		if p.Want != "" && !(len(k.Want) == 1 && k.Want[0] == p.Want) {
+		if p.Want != "" && (len(k.Want) != 1 || k.Want[0] != p.Want) {
 			continue
 		}
 		if p.SchemaLike != nil && !p.SchemaLike(e.SchemaURL) {
@@ -159,9 +159,9 @@ var noisePatterns = []noisePattern{
 	// "got number, want string" on k8s Quantity — the published schema types
 	// Quantity as a bare string, but the API server also accepts JSON numbers.
 	{
-		Keyword:  "type",
-		Got:      "number",
-		Want:     "string",
+		Keyword:    "type",
+		Got:        "number",
+		Want:       "string",
 		SchemaLike: func(url string) bool { return strings.HasSuffix(url, "/"+k8sQuantityDef) },
 	},
 }
@@ -204,6 +204,7 @@ func WalkLeaves(
 	walk(verr)
 	return out
 }
+
 // leafRange anchors a diagnostic on the most specific line. Most errors point
 // at their instance value, but additionalProperties and required report against
 // a parent object — which would anchor on the object's first child. Steer them
