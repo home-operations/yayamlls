@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/goccy/go-yaml/ast"
+	"github.com/home-operations/yayamlls/internal/schema"
 )
 
 type SourceDocument struct {
@@ -18,16 +19,13 @@ type SourceDocument struct {
 
 type RenderedManifest struct {
 	AST  *ast.DocumentNode
-	GVK  GVK
+	GVK  schema.GVK
 	Name string
 }
 
-// GVK identifies a Kubernetes type. Empty Group denotes the core API.
-type GVK struct {
-	Group   string
-	Version string
-	Kind    string
-}
+// GVK is an alias for schema.GVK kept for backward source-compat with
+// existing callers (e.g. the rendered.go bridge that hand-copies fields).
+type GVK = schema.GVK
 
 type RenderedOutput struct {
 	Provider  string

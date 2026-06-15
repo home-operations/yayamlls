@@ -11,6 +11,28 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
+// rangeFor returns the canonical node range, falling back to a single-line
+// token-anchored range when the AST has no extent info (e.g. comment-only
+// nodes). Symbol outlines anchor on the start; an "end one past the last
+// token" range is good enough for the outline UI.
+func rangeFor(n ast.Node, src string) protocol.Range {
+	if n == nil {
+		return protocol.Range{}
+	}
+	if r := yamlast.NodeRange(src, n); r.Start != (protocol.Position{}) {
+		return r
+	}
+	tok := n.GetToken()
+	if tok == nil || tok.Position == nil {
+		return protocol.Range{}
+	}
+	start := yamlast.UTF16Position(src, tok.Position.Line, tok.Position.Column)
+	return protocol.Range{
+		Start: start,
+		End:   protocol.Position{Line: start.Line, Character: start.Character + yamlast.UTF16Len(tok.Value)},
+	}
+}
+
 func Outline(parsed *yamlast.Parsed) []protocol.DocumentSymbol {
 	if parsed == nil || parsed.File == nil {
 		return nil
@@ -75,7 +97,7 @@ func mappingChildren(m *ast.MappingNode, src string) []protocol.DocumentSymbol {
 func mappingEntrySymbol(kv *ast.MappingValueNode, src string) protocol.DocumentSymbol {
 	keyName := keyString(kv.Key)
 	kind, detail := classify(kv.Value)
-	r := nodeRange(kv.Key, src)
+	r := rangeFor(kv.Key, src)
 	sym := protocol.DocumentSymbol{
 		Name:           keyName,
 		Kind:           kind,
@@ -101,7 +123,7 @@ func sequenceChildren(s *ast.SequenceNode, src string) []protocol.DocumentSymbol
 	out := make([]protocol.DocumentSymbol, 0, len(s.Values))
 	for i, item := range s.Values {
 		kind, detail := classify(item)
-		r := nodeRange(item, src)
+		r := rangeFor(item, src)
 		sym := protocol.DocumentSymbol{
 			Name:           fmt.Sprintf("[%d]", i),
 			Kind:           kind,
@@ -153,20 +175,4 @@ func keyString(n ast.Node) string {
 		return n.String()
 	}
 	return "?"
-}
-
-func nodeRange(n ast.Node, src string) protocol.Range {
-	if n == nil {
-		return protocol.Range{}
-	}
-	tok := n.GetToken()
-	if tok == nil || tok.Position == nil {
-		return protocol.Range{}
-	}
-	// goccy reports rune-based columns; LSP wants UTF-16 code units.
-	start := yamlast.UTF16Position(src, tok.Position.Line, tok.Position.Column)
-	return protocol.Range{
-		Start: start,
-		End:   protocol.Position{Line: start.Line, Character: start.Character + yamlast.UTF16Len(tok.Value)},
-	}
 }

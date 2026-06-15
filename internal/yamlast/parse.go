@@ -35,11 +35,6 @@ func ForCursor(p *Parsed, cursorLine int) *Parsed {
 	return Parse(lines)
 }
 
-// ParseForCursor is the lenient variant used by completion and hover.
-func ParseForCursor(text string, cursorLine int) *Parsed {
-	return ForCursor(Parse([]byte(text)), cursorLine)
-}
-
 func blankLine(text []byte, target int) ([]byte, bool) {
 	line := 0
 	for i, b := range text {

@@ -26,9 +26,9 @@ func TestInferPathByIndent_SequenceItemMapping(t *testing.T) {
 	}
 }
 
-func TestParseForCursor_RecoversFromBrokenLine(t *testing.T) {
+func TestForCursor_RecoversFromBrokenLine(t *testing.T) {
 	text := "name: Alice\nage: \"thirty"
-	p := ParseForCursor(text, 1)
+	p := ForCursor(Parse([]byte(text)), 1)
 	if p.File == nil || len(p.File.Docs) == 0 {
 		t.Fatalf("expected recovered AST, got nil docs")
 	}

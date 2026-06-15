@@ -151,6 +151,11 @@ func mapKeyString(n ast.Node) string {
 	return ""
 }
 
+// NodeRange is the exported alias for the LSP range covering a node, computed
+// from the node's full extent (handles multi-line block scalars via the
+// trimmed Origin). Pass the document text as src.
+func NodeRange(src string, n ast.Node) protocol.Range { return nodeRange(src, n) }
+
 func nodeRange(src string, n ast.Node) protocol.Range {
 	if n == nil {
 		return protocol.Range{}

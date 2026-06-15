@@ -28,7 +28,7 @@ func TestLocateCursor_SequenceItemContinuation(t *testing.T) {
 		{"nested sequence continuation", "spec:\n  containers:\n    - name: web\n      \n", 3, 6, "/spec/containers/0", true},
 	}
 	for _, c := range cases {
-		parsed := ParseForCursor(c.text, int(c.line))
+		parsed := ForCursor(Parse([]byte(c.text)), int(c.line))
 		ctx := LocateCursor(parsed, c.text, protocol.Position{Line: c.line, Character: c.char})
 		if ctx.Pointer != c.wantPointer || ctx.IsKey != c.wantIsKey {
 			t.Errorf("%s: pointer=%q isKey=%v, want pointer=%q isKey=%v",

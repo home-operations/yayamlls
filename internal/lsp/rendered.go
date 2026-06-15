@@ -67,30 +67,21 @@ func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *rend
 }
 
 func flattenRendered(out *render.RenderedOutput, m render.RenderedManifest, verr *jsonschema.ValidationError, opts diagnostics.Options) []protocol.Diagnostic {
-	var diags []protocol.Diagnostic
-	var walk func(*jsonschema.ValidationError)
-	walk = func(e *jsonschema.ValidationError) {
-		if len(e.Causes) == 0 {
-			if diagnostics.FluxSubstituted(m.AST, e, opts) {
-				return
-			}
-			loc := diagnostics.Pointer(e.InstanceLocation)
-			if loc == "" {
-				loc = "/"
-			}
-			diags = append(diags, protocol.Diagnostic{
-				Severity: ptr(protocol.DiagnosticSeverityError),
-				Source:   ptr(renderSource(out)),
-				Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, diagnostics.Message(e)),
-			})
-			return
+	src := renderSource(out)
+	return diagnostics.WalkLeaves(verr, func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool) {
+		if diagnostics.FluxSubstituted(m.AST, e, opts) {
+			return protocol.Diagnostic{}, true
 		}
-		for _, c := range e.Causes {
-			walk(c)
+		loc := diagnostics.Pointer(e.InstanceLocation)
+		if loc == "" {
+			loc = "/"
 		}
-	}
-	walk(verr)
-	return diags
+		return protocol.Diagnostic{
+			Severity: ptr(protocol.DiagnosticSeverityError),
+			Source:   &src,
+			Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, diagnostics.Message(e)),
+		}, false
+	})
 }
 
 func renderSource(out *render.RenderedOutput) string {

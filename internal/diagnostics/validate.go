@@ -99,23 +99,37 @@ type CauseData struct {
 func flattenValidationError(
 	doc *ast.DocumentNode, verr *jsonschema.ValidationError, src string, opts Options,
 ) []protocol.Diagnostic {
+	return WalkLeaves(verr, func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool) {
+		if FluxSubstituted(doc, e, opts) {
+			return protocol.Diagnostic{}, true
+		}
+		if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
+			return protocol.Diagnostic{}, true
+		}
+		return protocol.Diagnostic{
+			Severity: ptr(protocol.DiagnosticSeverityError),
+			Source:   ptr(Source),
+			Message:  fmt.Sprintf("%s (at %s)", Message(e), displayPointer(Pointer(e.InstanceLocation))),
+			Range:    leafRange(doc, e, src),
+			Data:     dataFor(e),
+		}, false
+	})
+}
+
+// WalkLeaves walks verr's leaf causes (no nested Causes) and yields a
+// diagnostic per leaf via the supplied builder. The builder returns
+// (diag, true) to skip emission; the source/diagnostics pair shares this
+// helper with the rendered-manifest path in the lsp package so the two
+// stay in lockstep on suppression and message formatting.
+func WalkLeaves(verr *jsonschema.ValidationError, build func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool)) []protocol.Diagnostic {
 	var out []protocol.Diagnostic
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			if FluxSubstituted(doc, e, opts) {
-				return
+			d, skip := build(e)
+			if !skip {
+				out = append(out, d)
 			}
-			if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
-				return
-			}
-			out = append(out, protocol.Diagnostic{
-				Severity: ptr(protocol.DiagnosticSeverityError),
-				Source:   ptr(Source),
-				Message:  fmt.Sprintf("%s (at %s)", Message(e), displayPointer(Pointer(e.InstanceLocation))),
-				Range:    leafRange(doc, e, src),
-				Data:     dataFor(e),
-			})
 			return
 		}
 		for _, c := range e.Causes {
