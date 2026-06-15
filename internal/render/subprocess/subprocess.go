@@ -8,14 +8,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/home-operations/yayamlls/internal/render"
 )
+
+// subprocessWaitDelay bounds how long cmd.Wait can block reading the child's
+// stdout/stderr pipes after a cancellation. Without it, a wrapper that
+// backgrounds a long-lived helper inheriting those pipes would keep the
+// renderer goroutine and FDs alive past the render timeout. A few seconds is
+// enough for well-behaved tools (kustomize, helm template) to exit; anything
+// still running is killed.
+const subprocessWaitDelay = 2 * time.Second
 
 // Config is the `renderers:` entry shape for a subprocess renderer.
 //
@@ -103,6 +113,10 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 	}
 
 	cmd := exec.CommandContext(ctx, bin, args[1:]...)
+	// Force-close the pipes if cancellation happens but grandchildren still
+	// hold them, so cmd.Wait doesn't keep this goroutine (and the render
+	// FDs) alive past the render timeout.
+	cmd.WaitDelay = subprocessWaitDelay
 	if doc.Path != "" {
 		cmd.Dir = filepath.Dir(doc.Path)
 	}
@@ -115,7 +129,13 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 		Raw:      append([]byte(nil), stdout.Bytes()...),
 		Stderr:   append([]byte(nil), stderr.Bytes()...),
 	}
+	// ErrWaitDelay is a soft signal that pipes were force-closed after
+	// cancellation: report the cancellation context to the caller rather
+	// than the OS-level "I/O was interrupted" error.
 	if runErr != nil {
+		if errors.Is(runErr, exec.ErrWaitDelay) && ctx.Err() != nil {
+			return out, ctx.Err()
+		}
 		return out, fmt.Errorf("%s: %w (stderr: %s)", r.name, runErr, truncate(stderr.String(), 512))
 	}
 	manifests, err := render.ParseManifests(stdout.Bytes())

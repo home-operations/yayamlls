@@ -1,6 +1,7 @@
 package render_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -135,4 +136,44 @@ func TestPipeline_LatestMatchesCurrentTextOnly(t *testing.T) {
 	if _, ok := p.Latest(uri, "a"); ok {
 		t.Error("Latest after Cancel should miss (cache dropped)")
 	}
+}
+
+// TestPipeline_InvalidateAllDropsInflightRenderResult locks in the epoch
+// guard: a render in flight when InvalidateAll fires must not repopulate the
+// cache with a stale result.
+func TestPipeline_InvalidateAllDropsInflightRenderResult(t *testing.T) {
+	reg := render.NewRegistry()
+	// Use a slow renderer so the epoch check fires during Render.
+	fr := &slowRenderer{delay: 100 * time.Millisecond, out: []byte("apiVersion: v1\nkind: Pod\n")}
+	reg.Register(fr)
+	sink := newRecordingSink()
+	p := render.NewPipeline(reg, sink)
+	p.SetDebounce(1 * time.Millisecond)
+
+	doc := &render.SourceDocument{URI: "file:///tmp/x.yaml", Text: "a"}
+	p.Schedule(doc)
+	// Let the timer fire and the slow render start.
+	time.Sleep(20 * time.Millisecond)
+	p.InvalidateAll()
+	// Wait for the slow render to finish — its result must be dropped.
+	time.Sleep(200 * time.Millisecond)
+	if _, ok := p.Latest(doc.URI, doc.Text); ok {
+		t.Fatal("stale render result was cached after InvalidateAll")
+	}
+}
+
+type slowRenderer struct {
+	delay time.Duration
+	out   []byte
+}
+
+func (s *slowRenderer) Name() string                        { return "slow" }
+func (s *slowRenderer) Matches(*render.SourceDocument) bool { return true }
+func (s *slowRenderer) Render(ctx context.Context, _ *render.SourceDocument) (*render.RenderedOutput, error) {
+	select {
+	case <-time.After(s.delay):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return &render.RenderedOutput{Provider: s.Name(), Raw: s.out}, nil
 }

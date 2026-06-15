@@ -60,11 +60,11 @@ func (s *Server) showInEditor(call glsp.CallFunc, uri, kind string) {
 // gives it the right editor filetype. Empty content means "not ready yet".
 func (s *Server) renderedView(uri, kind string) (content, ext string) {
 	if kind == renderKindDiff {
-		current := s.renderedRawFor(uri)
+		current, baseline := s.renderedRawAndBaseline(uri)
 		if len(current) == 0 {
 			return "", ""
 		}
-		return unifiedDiff(uri, s.renderedBaselineFor(uri), current), ".rendered.diff"
+		return unifiedDiff(uri, baseline, current), ".rendered.diff"
 	}
 	return string(s.renderedRawFor(uri)), ".rendered.yaml"
 }

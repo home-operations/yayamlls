@@ -25,11 +25,17 @@ type Pipeline struct {
 	mu      sync.Mutex
 	pending map[string]*pending
 	cache   map[string]cacheEntry
+	// epoch is bumped on every InvalidateAll. A pending render captures it
+	// at Schedule time and discards its result on writeback if it has changed,
+	// so an in-flight render can never repopulate the cache after the
+	// pipeline was asked to forget everything.
+	epoch uint64
 }
 
 type pending struct {
 	timer  *time.Timer
 	cancel context.CancelFunc
+	epoch  uint64
 }
 
 // cacheEntry memoizes the render for one URI's current content. Keying the
@@ -41,8 +47,12 @@ type cacheEntry struct {
 	err  error
 }
 
-// Sink.Notify runs on the pipeline's goroutine; implementations must be
-// non-blocking.
+// Sink.Notify runs on the render goroutine (the AfterFunc fired by Schedule
+// or the calling goroutine on a cache hit). It may block on I/O — the real
+// implementation does so to perform schema validation, and Schedule is only
+// invoked from goroutines that aren't the message loop, so the blocking is
+// bounded; new Sink implementations should likewise avoid the glsp message
+// loop.
 type Sink interface {
 	Notify(uri string, out *RenderedOutput, err error)
 }
@@ -91,15 +101,22 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 		p.sink.Notify(doc.URI, hit.out, hit.err)
 		return
 	}
+	// Capture the inputs the AfterFunc needs under the lock, then release it
+	// before calling time.AfterFunc: sync.Mutex is non-reentrant, and the
+	// AfterFunc body takes the same lock for its writeback. p.epoch is read
+	// here so a concurrent InvalidateAll (also under p.mu) is observed.
+	epoch := p.epoch
+	p.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	var self *pending
-	t := time.AfterFunc(p.debounce, func() {
+	self := &pending{cancel: cancel, epoch: epoch}
+	self.timer = time.AfterFunc(p.debounce, func() {
 		defer cancel()
 		out, err := r.Render(ctx, doc)
 		p.mu.Lock()
-		// A newer Schedule may have replaced us while we rendered; if so,
-		// discard this result so the latest content always wins.
-		if p.pending[doc.URI] != self {
+		// Two drop conditions: (a) a newer Schedule replaced us; (b) an
+		// InvalidateAll bumped the epoch while we were rendering, so writing
+		// back would resurrect content the caller asked to forget.
+		if p.pending[doc.URI] != self || self.epoch != p.epoch {
 			p.mu.Unlock()
 			return
 		}
@@ -108,7 +125,7 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 		p.mu.Unlock()
 		p.sink.Notify(doc.URI, out, err)
 	})
-	self = &pending{timer: t, cancel: cancel}
+	p.mu.Lock()
 	p.pending[doc.URI] = self
 	p.mu.Unlock()
 }
@@ -125,12 +142,16 @@ func (p *Pipeline) Latest(uri, text string) (*RenderedOutput, bool) {
 
 // InvalidateAll drops every cached render result, forcing the next Schedule
 // to re-render even unchanged document content. Used when a watched
-// workspace file changes, since renders depend on the on-disk tree. Pending
-// entries are left alone; a subsequent Schedule supersedes them.
+// workspace file changes, since renders depend on the on-disk tree. The
+// epoch bump also drops any in-flight render result: a pending writeback
+// checks it on completion and discards the output if a newer InvalidateAll
+// arrived while the render was running, so the cache stays empty until a
+// fresh Schedule succeeds.
 func (p *Pipeline) InvalidateAll() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	clear(p.cache)
+	p.epoch++
 }
 
 // Cancel drops a URI's pending render and cached result. Called when a

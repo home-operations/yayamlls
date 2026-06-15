@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -80,8 +81,8 @@ func TestInitialized_RegistersFileWatchers(t *testing.T) {
 				t.Fatalf("registration method = %q", regs[0].Method)
 			}
 			opts := regs[0].RegisterOptions.(protocol.DidChangeWatchedFilesRegistrationOptions)
-			if len(opts.Watchers) != 2 {
-				t.Fatalf("expected 2 watchers, got %+v", opts.Watchers)
+			if len(opts.Watchers) < 2 {
+				t.Fatalf("expected at least 2 watchers, got %+v", opts.Watchers)
 			}
 			return
 		}
@@ -173,4 +174,38 @@ func TestDidChangeWatchedFiles_InvalidatesRendererTrees(t *testing.T) {
 	if len(fr.invalidated) != 1 || fr.invalidated[0] != "/ws/apps/cm.yaml" {
 		t.Fatalf("InvalidateTree calls = %+v", fr.invalidated)
 	}
+}
+
+func TestInitialized_RegistersWatchersForNonYAMLRenderInputs(t *testing.T) {
+	rec := &registrationRecorder{}
+	ctx := rec.ctx()
+	s := New("test", render.NewRegistry())
+	if _, err := s.initialize(ctx, &protocol.InitializeParams{Capabilities: watchCapabilities(t)}); err != nil {
+		t.Fatalf("initialize: %v", err)
+	}
+	if err := s.initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("initialized: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		got := rec.recorded()
+		if len(got) > 0 {
+			opts := got[0].Registrations[0].RegisterOptions.(protocol.DidChangeWatchedFilesRegistrationOptions)
+			var hasNonYAML bool
+			for _, w := range opts.Watchers {
+				if !strings.Contains(w.GlobPattern, "yaml") &&
+					!strings.Contains(w.GlobPattern, "yml") &&
+					!strings.Contains(w.GlobPattern, "yayamlls") {
+					hasNonYAML = true
+					break
+				}
+			}
+			if !hasNonYAML {
+				t.Fatalf("no watcher covers non-YAML render inputs (chart .tpl etc.); watchers = %+v", opts.Watchers)
+			}
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("registration call never issued")
 }
