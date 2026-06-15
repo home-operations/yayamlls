@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.8](https://github.com/home-operations/yayamlls/compare/0.1.7...0.1.8) (2026-06-15)
+
+
+### Bug Fixes
+
+* **diagnostics:** apply gofmt and De Morgan lint ([a5a3003](https://github.com/home-operations/yayamlls/commit/a5a30036392e373e2c0b14af75a726fded5257fb))
+
+
+### Code Refactoring
+
+* **diagnostics:** declarative noise pattern registry ([b0ad261](https://github.com/home-operations/yayamlls/commit/b0ad261efcf8c041a566da5536f7f581e5fe2c5e))
+
 ## [0.1.7](https://github.com/home-operations/yayamlls/compare/0.1.6...0.1.7) (2026-06-15)
 
 
