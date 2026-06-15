@@ -110,6 +110,49 @@ func TestValidateDoc_FluxSubstitution_PartialAndMultipleTokensSuppressed(t *test
 	}
 }
 
+// nullableAnyOfSchema mirrors how Kubernetes models an optional field:
+// resources is anyOf:[<object>, {type:null}]. A populated, otherwise-invalid
+// object fails both branches, so the {type:null} branch emits a spurious
+// "want null" leaf alongside the real error.
+const nullableAnyOfSchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"resources": {
+			"anyOf": [
+				{
+					"type": "object",
+					"properties": {"cpu": {"type": "string"}},
+					"additionalProperties": false
+				},
+				{"type": "null"}
+			]
+		}
+	}
+}`
+
+func TestValidateDoc_NullableAnyOf_SuppressesWantNullNoise(t *testing.T) {
+	sch := compileInlineSchema(t, nullableAnyOfSchema)
+	body := "resources:\n  cpu: 1\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	for _, d := range diags {
+		if strings.Contains(d.Message, "want null") {
+			t.Errorf("expected no \"want null\" noise from nullable anyOf, got: %s", d.Message)
+		}
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "/resources/cpu") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the real /resources/cpu type error to survive; got: %+v", diags)
+	}
+}
+
 func TestValidate_TypeMismatchProducesDiagnostic(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	repo := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))

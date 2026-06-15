@@ -129,6 +129,9 @@ func WalkLeaves(
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
+			if nullBranchNoise(e) {
+				return
+			}
 			d, skip := build(e)
 			if !skip {
 				out = append(out, d)
@@ -141,6 +144,19 @@ func WalkLeaves(
 	}
 	walk(verr)
 	return out
+}
+
+// nullBranchNoise reports whether e is a "got X, want null" type mismatch on a
+// non-null value. Kubernetes schemas model an optional field as
+// anyOf:[<realType>, {type:null}]; when the value is present the {type:null}
+// branch always fails, but the sibling branch carries the meaningful error.
+// Surfacing this leaf would redline every populated optional field, so drop it.
+func nullBranchNoise(e *jsonschema.ValidationError) bool {
+	k, ok := e.ErrorKind.(*kind.Type)
+	if !ok {
+		return false
+	}
+	return len(k.Want) == 1 && k.Want[0] == "null" && k.Got != "null"
 }
 
 // leafRange anchors a diagnostic on the most specific line. Most errors point
