@@ -128,3 +128,25 @@ func TestNoSuppressWithoutYayamllsSource(t *testing.T) {
 		t.Errorf("expected 0 actions for foreign source, got %d", len(got))
 	}
 }
+
+func TestSuppressActionCRLF(t *testing.T) {
+	source := diagnostics.Source
+	diag := protocol.Diagnostic{
+		Range:  protocol.Range{Start: protocol.Position{Line: 1, Character: 2}, End: protocol.Position{Line: 1, Character: 5}},
+		Source: &source,
+		Data:   diagnostics.CauseData{Kind: "type", InstanceLocation: "/spec"},
+	}
+	// CRLF line endings: the directive must append before the CR, not between
+	// CR and LF.
+	const text = "spec:\r\n  foo: bar\r\n"
+	got := actions.Compute("file:///x.yaml", text, nil, []protocol.Diagnostic{diag})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 suppress action, got %d", len(got))
+	}
+	e := got[0].Edit.Changes["file:///x.yaml"][0]
+	// Insertion column must equal the visible content length ("  foo: bar"),
+	// excluding the trailing '\r'.
+	if at := (protocol.Position{Line: 1, Character: uint32(len("  foo: bar"))}); e.Range.Start != at {
+		t.Errorf("CRLF edit position %+v, want before CR at char %d", e.Range.Start, len("  foo: bar"))
+	}
+}

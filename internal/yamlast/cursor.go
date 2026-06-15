@@ -157,11 +157,11 @@ func tokenColumn(n ast.Node) int {
 // token columns. Indentation is ASCII whitespace, so a rune count is the
 // right unit for comparing against key/dash columns.
 func cursorColumn(text string, pos protocol.Position) int {
-	lines := strings.Split(text, "\n")
-	if int(pos.Line) >= len(lines) {
+	line, ok := lineText(text, int(pos.Line))
+	if !ok {
 		return 1
 	}
-	return utf8.RuneCountInString(lineUpToUTF16(lines[pos.Line], pos.Character)) + 1
+	return utf8.RuneCountInString(lineUpToUTF16(line, pos.Character)) + 1
 }
 
 // pathToPointer converts goccy's YAMLPath (e.g. `$.a.'b.c'[0]`) into an RFC
@@ -226,8 +226,11 @@ func OffsetAt(text string, pos protocol.Position) int {
 			if col >= pos.Character {
 				return i
 			}
-			if r == '\n' {
-				return i // column past end of line: clamp to line end
+			// Clamp a past-end column to the line end. On a CRLF line the
+			// terminator is "\r\n"; clamp before the CR so the offset never
+			// lands between CR and LF (which would split the terminator).
+			if r == '\n' || (r == '\r' && i+1 < len(text) && text[i+1] == '\n') {
+				return i
 			}
 		}
 		if r == '\n' {

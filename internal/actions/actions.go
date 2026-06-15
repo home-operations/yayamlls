@@ -36,6 +36,10 @@ func suppressAction(uri, text string, d protocol.Diagnostic) (protocol.CodeActio
 	}
 	line := d.Range.Start.Line
 	src, _ := yamlast.LineText(text, int(line))
+	// LineText splits on '\n' only, so on a CRLF document src keeps a trailing
+	// '\r'. Trim it before measuring the insertion column and inspecting the
+	// line, or the directive lands between the CR and LF and corrupts the line.
+	src = strings.TrimSuffix(src, "\r")
 	kind := protocol.CodeActionKindQuickFix
 	var edit protocol.TextEdit
 	if canTrail(src) {

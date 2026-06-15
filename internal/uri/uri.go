@@ -18,7 +18,21 @@ func ToPath(uriStr string) string {
 	if err != nil || u.Scheme != "file" {
 		return ""
 	}
-	p := u.Path
+	// Rebuild the path from escaped components so a raw '?' or '#' that a
+	// non-encoding client left in the filename isn't silently dropped:
+	// url.Parse would otherwise split those into Query/Fragment and truncate
+	// the path. Conformant clients percent-encode them, which decodes the same.
+	raw := u.EscapedPath()
+	if u.RawQuery != "" {
+		raw += "?" + u.RawQuery
+	}
+	if u.Fragment != "" {
+		raw += "#" + u.EscapedFragment()
+	}
+	p, err := url.PathUnescape(raw)
+	if err != nil {
+		p = u.Path
+	}
 	if runtime.GOOS == "windows" {
 		if len(p) >= 3 && p[0] == '/' && p[2] == ':' {
 			p = p[1:]

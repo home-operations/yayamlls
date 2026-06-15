@@ -112,3 +112,20 @@ func TestIsKeyLine(t *testing.T) {
 		})
 	}
 }
+
+func TestOffsetAt_CRLFClampDoesNotSplitTerminator(t *testing.T) {
+	const text = "ab\r\ncd\r\n"
+	// An over-range column on a CRLF line must clamp before the CR (offset 2),
+	// never between CR and LF (offset 3).
+	if got := OffsetAt(text, protocol.Position{Line: 0, Character: 99}); got != 2 {
+		t.Errorf("over-range clamp = %d, want 2 (before CR)", got)
+	}
+	// A column landing exactly at the CR also clamps before it.
+	if got := OffsetAt(text, protocol.Position{Line: 0, Character: 3}); got != 2 {
+		t.Errorf("at-CR clamp = %d, want 2 (before CR)", got)
+	}
+	// In-range columns are unaffected.
+	if got := OffsetAt(text, protocol.Position{Line: 0, Character: 1}); got != 1 {
+		t.Errorf("in-range = %d, want 1", got)
+	}
+}

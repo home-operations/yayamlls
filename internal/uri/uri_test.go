@@ -26,3 +26,18 @@ func TestToPath_NonFileURIIsEmpty(t *testing.T) {
 		t.Errorf("ToPath = %q, want empty", got)
 	}
 }
+
+func TestToPath_UnencodedHashAndQuery(t *testing.T) {
+	cases := map[string]string{
+		"file:///home/user/a#b.yaml":   "/home/user/a#b.yaml",
+		"file:///home/user/a?b.yaml":   "/home/user/a?b.yaml",
+		"file:///home/user/a%23b.yaml": "/home/user/a#b.yaml",
+		"file:///home/user/plain.yaml": "/home/user/plain.yaml",
+		"file:///home/user/a%20b.yaml": "/home/user/a b.yaml",
+	}
+	for in, want := range cases {
+		if got := ToPath(in); got != want {
+			t.Errorf("ToPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
