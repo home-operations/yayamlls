@@ -16,11 +16,12 @@ import (
 const negativeTTL = 5 * time.Minute
 
 type Store struct {
-	mu       sync.Mutex
-	loader   jsonschema.URLLoader
-	compiled map[string]*jsonschema.Schema
-	failures map[string]failure
-	inflight map[string]*inflightCompile
+	mu         sync.Mutex
+	loader     jsonschema.URLLoader
+	fileLoader *secureFileLoader
+	compiled   map[string]*jsonschema.Schema
+	failures   map[string]failure
+	inflight   map[string]*inflightCompile
 }
 
 type failure struct {
@@ -38,23 +39,32 @@ type inflightCompile struct {
 }
 
 func NewStore() *Store {
+	file := &secureFileLoader{}
 	return &Store{
-		loader:   newURLLoader(),
-		compiled: make(map[string]*jsonschema.Schema),
-		failures: make(map[string]failure),
-		inflight: make(map[string]*inflightCompile),
+		loader:     newURLLoader(file),
+		fileLoader: file,
+		compiled:   make(map[string]*jsonschema.Schema),
+		failures:   make(map[string]failure),
+		inflight:   make(map[string]*inflightCompile),
 	}
 }
 
 // newURLLoader builds the scheme loader shared by every compile.
-func newURLLoader() jsonschema.URLLoader {
+func newURLLoader(file jsonschema.URLLoader) jsonschema.URLLoader {
 	disk := newDiskLoader()
 	return jsonschema.SchemeURLLoader{
-		"file":     jsonschema.FileLoader{},
+		"file":     file,
 		"http":     disk,
 		"https":    disk,
 		"embedded": embeddedLoader{},
 	}
+}
+
+// SetTrustRoot restricts file:// schema refs to paths inside root, blocking an
+// untrusted modeline/config from reading arbitrary local files. An empty root
+// (e.g. the CLI validate path) leaves file refs unrestricted.
+func (s *Store) SetTrustRoot(root string) {
+	s.fileLoader.setRoot(root)
 }
 
 // Cached returns an already-compiled schema without any network I/O, so

@@ -11,6 +11,7 @@ import (
 )
 
 func TestDiskCachedLoad_ServesFromCacheAfterFirstHit(t *testing.T) {
+	enableLoopbackForTest(t)
 	const body = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 	const etag = `"v1"`
 

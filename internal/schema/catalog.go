@@ -37,7 +37,7 @@ func NewCatalog(url string) *Catalog {
 	}
 	return &Catalog{
 		URL:    url,
-		Client: &http.Client{Timeout: 10 * time.Second},
+		Client: safeHTTPClient(10 * time.Second),
 		done:   make(chan struct{}),
 	}
 }
@@ -70,14 +70,24 @@ func (c *Catalog) Match(docPath string) string {
 	if docPath == "" || !c.loaded.Load() || c.loadErr != nil {
 		return ""
 	}
+	// Hoist the docPath normalize+clean out of the inner loop: globMatch is
+	// called up to twice per catalog entry (~thousands of patterns) and the
+	// path-clean work is identical for every entry. Letting matchGlob redo it
+	// per pattern is wasted CPU on the typing-latency path.
+	norm, ok := normalizeForMatch(docPath)
+	if !ok {
+		return ""
+	}
 	for _, e := range c.entries {
 		for _, pat := range e.FileMatch {
-			if matchGlob(pat, docPath) {
+			if matchNormalized(pat, norm) {
 				return e.URL
 			}
 			// Catalog patterns commonly omit a leading `**/`.
-			if !startsWithStar(pat) && matchGlob("**/"+pat, docPath) {
-				return e.URL
+			if !startsWithStar(pat) {
+				if matchNormalized("**/"+pat, norm) {
+					return e.URL
+				}
 			}
 		}
 	}

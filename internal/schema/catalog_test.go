@@ -11,6 +11,7 @@ import (
 // The catalog goes through the schema disk cache: a second process-lifetime
 // load inside the freshness TTL must not hit the origin at all.
 func TestCatalog_LoadServedFromDiskCache(t *testing.T) {
+	enableLoopbackForTest(t)
 	const body = `{"schemas":[{"name":"x","url":"https://example.com/x.json","fileMatch":["x.yaml"]}]}`
 
 	var hits int64
