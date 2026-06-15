@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.5](https://github.com/home-operations/yayamlls/compare/0.1.4...0.1.5) (2026-06-15)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/home-operations/flate (v0.4.6 → v0.4.7) ([#62](https://github.com/home-operations/yayamlls/issues/62)) ([0147e28](https://github.com/home-operations/yayamlls/commit/0147e28b26a6d9c6aa6218c6b0d2c4a82f157550))
+* guard nil ctx, forward validate options, tolerate fingerprint wa… ([#60](https://github.com/home-operations/yayamlls/issues/60)) ([f27483d](https://github.com/home-operations/yayamlls/commit/f27483dd3b1668b9a9dc7b9d7239658ee6c746d2))
+* **lint:** drop dead renderedBaselineFor, wrap WalkLeaves signature ([ddaee14](https://github.com/home-operations/yayamlls/commit/ddaee141dc85b767b805701c3ead04ac1241f3ab))
+* **lsp:** CRLF and UTF-16 position-mapping correctness ([ec9be34](https://github.com/home-operations/yayamlls/commit/ec9be34f7710aeb4c0714168aa1d346dde85f69a))
+* **lsp:** surface .yayamlls.yaml reload errors instead of wiping config ([0db24eb](https://github.com/home-operations/yayamlls/commit/0db24eb8e0625761a1435973cbf0a7087c57e29e))
+* **render:** pipeline epoch atomicity, subprocess WaitDelay, broader watched files ([32a1a1b](https://github.com/home-operations/yayamlls/commit/32a1a1b18ee15b506e17d1f25e092a8577076d8b))
+* **schema:** make matchSettings selection deterministic ([8f6397f](https://github.com/home-operations/yayamlls/commit/8f6397f3197fa0625ea06d3e60295b8b84f604dc))
+* **security:** drop untrusted-workspace renderer commands; surface Configure errors ([6d388ad](https://github.com/home-operations/yayamlls/commit/6d388adf35f7b473cbb9fe6945d7172116062b72))
+* **security:** harden schema URL loader ([c42ee6c](https://github.com/home-operations/yayamlls/commit/c42ee6cef6ccef13712c9c9aa523a7c7c95bc4c4))
+
+
+### Code Refactoring
+
+* dedup GVK/NodeRange/WalkLeaves, shallow DetectGVK, drop dead ParseForCursor ([1fb7d9a](https://github.com/home-operations/yayamlls/commit/1fb7d9a1692f3707aec220e1acfa75b7fdb14ba7))
+
 ## [0.1.4](https://github.com/home-operations/yayamlls/compare/0.1.3...0.1.4) (2026-06-14)
 
 
