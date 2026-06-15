@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/home-operations/yayamlls/compare/0.1.6...0.1.7) (2026-06-15)
+
+
+### Bug Fixes
+
+* **diagnostics:** accept numeric Kubernetes Quantity values ([41225f3](https://github.com/home-operations/yayamlls/commit/41225f3cd50d4f1cecbd8e2385ad4ea0758afea4))
+
 ## [0.1.6](https://github.com/home-operations/yayamlls/compare/0.1.5...0.1.6) (2026-06-15)
 
 
