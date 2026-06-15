@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/home-operations/yayamlls/compare/0.1.5...0.1.6) (2026-06-15)
+
+
+### Bug Fixes
+
+* **diagnostics:** drop spurious "want null" leaves from nullable anyOf ([#65](https://github.com/home-operations/yayamlls/issues/65)) ([68ae49b](https://github.com/home-operations/yayamlls/commit/68ae49ba6dd608f436d7ec1d0c08f2c991f0b33a))
+
 ## [0.1.5](https://github.com/home-operations/yayamlls/compare/0.1.4...0.1.5) (2026-06-15)
 
 
