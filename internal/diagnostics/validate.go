@@ -121,7 +121,10 @@ func flattenValidationError(
 // (diag, true) to skip emission; the source/diagnostics pair shares this
 // helper with the rendered-manifest path in the lsp package so the two
 // stay in lockstep on suppression and message formatting.
-func WalkLeaves(verr *jsonschema.ValidationError, build func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool)) []protocol.Diagnostic {
+func WalkLeaves(
+	verr *jsonschema.ValidationError,
+	build func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool),
+) []protocol.Diagnostic {
 	var out []protocol.Diagnostic
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {

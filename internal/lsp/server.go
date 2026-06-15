@@ -563,12 +563,6 @@ func (s *Server) renderedRawFor(uri string) []byte {
 	return s.renderedRaw[uri]
 }
 
-func (s *Server) renderedBaselineFor(uri string) []byte {
-	s.rendMu.Lock()
-	defer s.rendMu.Unlock()
-	return s.renderedBaseline[uri]
-}
-
 // renderedRawAndBaseline returns raw and baseline for uri under a single
 // rendMu acquisition, so a concurrent Notify can't write between the two
 // reads and produce a diff against a one-generation-stale raw.
