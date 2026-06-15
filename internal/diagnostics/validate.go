@@ -116,6 +116,65 @@ func flattenValidationError(
 	})
 }
 
+// noisePattern describes a false-positive validation error declaratively.
+// Fields are matched conjunctively; an empty string means "don't care".
+type noisePattern struct {
+	Keyword    string // first element of ErrorKind.KeywordPath()
+	Got        string // desired type.Got value
+	Want       string // desired type.Want[0] value
+	SchemaLike func(string) bool // nil means don't care
+}
+
+// matchNoise reports whether e matches any registered noise pattern.
+func matchNoise(patterns []noisePattern, e *jsonschema.ValidationError) bool {
+	for _, p := range patterns {
+		if p.Keyword != "" && keyword(e) != p.Keyword {
+			continue
+		}
+		k, ok := e.ErrorKind.(*kind.Type)
+		if !ok {
+			continue
+		}
+		if p.Got != "" && k.Got != p.Got {
+			continue
+		}
+		if p.Want != "" && !(len(k.Want) == 1 && k.Want[0] == p.Want) {
+			continue
+		}
+		if p.SchemaLike != nil && !p.SchemaLike(e.SchemaURL) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// noisePatterns is the list of false-positive patterns. Each row is self-
+// documenting through its surrounding comments — add a new one, done.
+var noisePatterns = []noisePattern{
+	// "got X, want null" — k8s anyOf[<type>, null] always fails the null
+	// branch when a value is present. Handled by the real sibling branch.
+	{Keyword: "type", Want: "null"},
+
+	// "got number, want string" on k8s Quantity — the published schema types
+	// Quantity as a bare string, but the API server also accepts JSON numbers.
+	{
+		Keyword:  "type",
+		Got:      "number",
+		Want:     "string",
+		SchemaLike: func(url string) bool { return strings.HasSuffix(url, "/"+k8sQuantityDef) },
+	},
+}
+
+// k8sQuantityDef is the definition name Kubernetes JSON schemas use for the
+// apimachinery Quantity type; it appears as the trailing fragment of the
+// dereferenced SchemaURL on a failing quantity field.
+const k8sQuantityDef = "io.k8s.apimachinery.pkg.api.resource.Quantity"
+
+func skipNoise(e *jsonschema.ValidationError) bool {
+	return matchNoise(noisePatterns, e)
+}
+
 // WalkLeaves walks verr's leaf causes (no nested Causes) and yields a
 // diagnostic per leaf via the supplied builder. The builder returns
 // (diag, true) to skip emission; the source/diagnostics pair shares this
@@ -129,7 +188,7 @@ func WalkLeaves(
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			if nullBranchNoise(e) || quantityNumberNoise(e) {
+			if skipNoise(e) {
 				return
 			}
 			d, skip := build(e)
@@ -145,41 +204,6 @@ func WalkLeaves(
 	walk(verr)
 	return out
 }
-
-// nullBranchNoise reports whether e is a "got X, want null" type mismatch on a
-// non-null value. Kubernetes schemas model an optional field as
-// anyOf:[<realType>, {type:null}]; when the value is present the {type:null}
-// branch always fails, but the sibling branch carries the meaningful error.
-// Surfacing this leaf would redline every populated optional field, so drop it.
-func nullBranchNoise(e *jsonschema.ValidationError) bool {
-	k, ok := e.ErrorKind.(*kind.Type)
-	if !ok {
-		return false
-	}
-	return len(k.Want) == 1 && k.Want[0] == "null" && k.Got != "null"
-}
-
-// k8sQuantityDef is the definition name Kubernetes JSON schemas use for the
-// apimachinery Quantity type; it appears as the trailing fragment of the
-// dereferenced SchemaURL on a failing quantity field.
-const k8sQuantityDef = "io.k8s.apimachinery.pkg.api.resource.Quantity"
-
-// quantityNumberNoise reports whether e is a "got number, want string" type
-// mismatch against the Kubernetes Quantity schema. Published k8s schemas type
-// Quantity as a bare string, but the API server's unmarshaler also accepts JSON
-// numbers (e.g. `cpu: 1`), so a numeric quantity is valid and the diagnostic is
-// a false positive.
-func quantityNumberNoise(e *jsonschema.ValidationError) bool {
-	k, ok := e.ErrorKind.(*kind.Type)
-	if !ok {
-		return false
-	}
-	if k.Got != "number" || len(k.Want) != 1 || k.Want[0] != "string" {
-		return false
-	}
-	return strings.HasSuffix(e.SchemaURL, "/"+k8sQuantityDef)
-}
-
 // leafRange anchors a diagnostic on the most specific line. Most errors point
 // at their instance value, but additionalProperties and required report against
 // a parent object — which would anchor on the object's first child. Steer them
