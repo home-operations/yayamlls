@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "^1.125.0",
     "typescript": "^6.0.0"
   },
   "contributes": {
@@ -103,6 +103,6 @@
     "onLanguage:yaml"
   ],
   "engines": {
-    "vscode": "^1.124.2"
+    "vscode": "^1.125.0"
   }
 }
