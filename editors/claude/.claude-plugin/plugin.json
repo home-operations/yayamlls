@@ -3,7 +3,7 @@
   "name": "yayamlls",
   "displayName": "yayamlls",
   "description": "Schema-driven YAML diagnostics, completion, hover, and Flux rendering via the yayamlls language server.",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "author": {
     "name": "home-operations",
     "url": "https://github.com/home-operations/yayamlls"

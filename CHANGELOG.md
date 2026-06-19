@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.9](https://github.com/home-operations/yayamlls/compare/0.1.8...0.1.9) (2026-06-19)
+
+
+### Features
+
+* **cli:** validate rendered Flux output with validate --render ([#75](https://github.com/home-operations/yayamlls/issues/75)) ([606cebd](https://github.com/home-operations/yayamlls/commit/606cebd120a08bd11b24c8b99eb1be49b9532f1e))
+* **deps:** update dependency vscode (1.124.2 → 1.125.0) ([#71](https://github.com/home-operations/yayamlls/issues/71)) ([6745bcd](https://github.com/home-operations/yayamlls/commit/6745bcd6e54e0549c7cc9cb453554aa571609666))
+
 ## [0.1.8](https://github.com/home-operations/yayamlls/compare/0.1.7...0.1.8) (2026-06-15)
 
 
