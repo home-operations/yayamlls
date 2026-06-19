@@ -406,7 +406,7 @@ func (s *Server) diagnosticOptions() diagnostics.Options {
 }
 
 func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
-	diags := renderDiagnostics(s.schemas, s.resolver, out, err, s.diagnosticOptions())
+	diags := lint.RenderedDiagnostics(s.schemas, s.resolver, out, err, s.diagnosticOptions())
 
 	s.rendMu.Lock()
 	s.renderedDiags[uri] = diags

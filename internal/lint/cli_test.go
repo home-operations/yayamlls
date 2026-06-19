@@ -42,7 +42,7 @@ func run(t *testing.T, root string, args ...string) (code int, stdout, stderr st
 	t.Helper()
 	var out, errb bytes.Buffer
 	full := append([]string{"--root", root}, args...)
-	code = lint.Run(full, &out, &errb)
+	code = lint.Run(full, nil, &out, &errb)
 	return code, out.String(), errb.String()
 }
 
@@ -88,8 +88,8 @@ func TestRun_InvalidDocReportsAndExitsOne(t *testing.T) {
 	if !strings.Contains(stdout, "bad.yaml:3:") || !strings.Contains(stdout, "/age") {
 		t.Errorf("expected an /age error at line 3, got: %q", stdout)
 	}
-	if !strings.Contains(stdout, "error:") {
-		t.Errorf("expected error severity label, got: %q", stdout)
+	if !strings.Contains(stdout, ": yayamlls ") {
+		t.Errorf("expected ruff-style `path:line:col: yayamlls message`, got: %q", stdout)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestRun_MultiDocDedupsLoadFailureWarning(t *testing.T) {
 
 func TestRun_NoArgsExitsTwo(t *testing.T) {
 	var out, errb bytes.Buffer
-	if code := lint.Run(nil, &out, &errb); code != 2 {
+	if code := lint.Run(nil, nil, &out, &errb); code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
 	}
 	if !strings.Contains(errb.String(), "usage:") {
