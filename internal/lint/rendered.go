@@ -1,4 +1,4 @@
-package lsp
+package lint
 
 import (
 	"errors"
@@ -12,9 +12,13 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-// renderDiagnostics validates rendered manifests; rendered docs have no
-// source line, so the kind/name/jsonptr is embedded in each message.
-func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *render.RenderedOutput, err error, opts diagnostics.Options) []protocol.Diagnostic {
+// RenderedDiagnostics validates rendered manifests; rendered docs have no
+// source line, so the kind/name/jsonptr is embedded in each message. Both the
+// LSP server and the `validate --render` command share it so they report
+// identically.
+func RenderedDiagnostics(
+	store *schema.Store, resolver *schema.Resolver, out *render.RenderedOutput, err error, opts diagnostics.Options,
+) []protocol.Diagnostic {
 	if err != nil {
 		// The renderer's external tool isn't installed; rendering is an
 		// opt-in extra, so stay silent rather than redlining every Flux doc.
@@ -66,7 +70,9 @@ func renderDiagnostics(store *schema.Store, resolver *schema.Resolver, out *rend
 	return diags
 }
 
-func flattenRendered(out *render.RenderedOutput, m render.RenderedManifest, verr *jsonschema.ValidationError, opts diagnostics.Options) []protocol.Diagnostic {
+func flattenRendered(
+	out *render.RenderedOutput, m render.RenderedManifest, verr *jsonschema.ValidationError, opts diagnostics.Options,
+) []protocol.Diagnostic {
 	src := renderSource(out)
 	return diagnostics.WalkLeaves(verr, func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool) {
 		if diagnostics.FluxSubstituted(m.AST, e, opts) {
@@ -90,3 +96,5 @@ func renderSource(out *render.RenderedOutput) string {
 	}
 	return diagnostics.Source + "/" + out.Provider
 }
+
+func ptr[T any](v T) *T { return &v }

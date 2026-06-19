@@ -1,4 +1,4 @@
-package lsp
+package lint
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestRenderDiagnostics_UnavailableRendererIsSilent(t *testing.T) {
-	diags := renderDiagnostics(schema.NewStore(), schema.NewResolver(), nil,
+	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), nil,
 		render.ErrRendererUnavailable, diagnostics.Options{})
 	if diags != nil {
 		t.Errorf("expected no diagnostics for unavailable renderer, got %v", diags)
@@ -23,7 +23,7 @@ func TestRenderDiagnostics_UnavailableRendererIsSilent(t *testing.T) {
 
 func TestRenderDiagnostics_RenderErrorSurfacedWithProviderSource(t *testing.T) {
 	out := &render.RenderedOutput{Provider: "flate"}
-	diags := renderDiagnostics(schema.NewStore(), schema.NewResolver(), out,
+	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), out,
 		errors.New("boom"), diagnostics.Options{})
 	if len(diags) != 1 {
 		t.Fatalf("expected one diagnostic, got %d", len(diags))

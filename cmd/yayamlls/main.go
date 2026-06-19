@@ -21,12 +21,16 @@ var (
 )
 
 func main() {
+	registry := render.NewRegistry()
+	registry.Register(flate.New())
+	registry.SetFactory(subprocess.FromConfig)
+
 	// Subcommands run one-shot and exit; absent one, the binary is the
 	// stdio language server.
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "validate", "lint":
-			os.Exit(lint.Run(os.Args[2:], os.Stdout, os.Stderr))
+			os.Exit(lint.Run(os.Args[2:], registry, os.Stdout, os.Stderr))
 		}
 	}
 
@@ -54,10 +58,6 @@ func main() {
 		logPath = &logFile
 	}
 	commonlog.Configure(verbosity, logPath)
-
-	registry := render.NewRegistry()
-	registry.Register(flate.New())
-	registry.SetFactory(subprocess.FromConfig)
 
 	s := lsp.New(version, registry)
 	srv := server.NewServer(s.Handler(), "yayamlls", false)

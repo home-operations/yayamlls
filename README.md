@@ -62,6 +62,37 @@ each [GitHub release](https://github.com/home-operations/yayamlls/releases).
 
 Flux rendering is built in via [flate][flate]; no separate install is needed.
 
+## Command line
+
+`yayamlls validate` (alias `lint`) validates files for CI or ad-hoc checks,
+resolving schemas exactly as the editor does. Pass files or directories
+(directories are walked for `*.yaml`/`*.yml`):
+
+```sh
+yayamlls validate kubernetes/                 # whole tree
+yayamlls validate app/helmrelease.yaml ks.yaml
+```
+
+Diagnostics print ruff-style, `path:line:col: source message`, and the exit
+code is `1` if any error was reported, `2` on a usage/IO error, else `0`.
+`--root <dir>` pins the workspace root for `.yayamlls.yaml` (default:
+auto-detect).
+
+Add `--render` to also render Flux `HelmRelease`/`Kustomization` documents via
+[flate][flate] and validate the rendered manifests — the apply-time check, not
+just the source files:
+
+```sh
+yayamlls validate --render kubernetes/
+```
+
+Rendering shells out to git/helm, so it is opt-in and slower than raw
+validation; the render tree is built once per run and reused across documents,
+so validating a whole directory in one invocation is far cheaper than
+file-by-file. A render that can't resolve a document (e.g. a component base
+template with unsubstituted `${vars}`) is reported as a warning and does not
+fail the run; only schema violations in rendered output do.
+
 ## Editor setup
 
 `yayamlls` speaks LSP 3.16 over stdio. Put the binary on `$PATH` or pass
