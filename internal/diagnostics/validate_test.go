@@ -189,6 +189,110 @@ func TestValidateDoc_Quantity_SuppressesNumericStringNoise(t *testing.T) {
 	}
 }
 
+// nodeLabelsSchema mirrors a Talos/Kubernetes map[string]string field, where a
+// strategic-merge `{$patch: delete}` value trips a "got object, want string".
+const nodeLabelsSchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"nodeLabels": {"type": "object", "additionalProperties": {"type": "string"}}
+	}
+}`
+
+func TestValidateDoc_StrategicMergePatch_DirectiveSuppressed(t *testing.T) {
+	sch := compileInlineSchema(t, nodeLabelsSchema)
+	body := "nodeLabels:\n" +
+		"  node.kubernetes.io/exclude-from-external-load-balancers:\n" +
+		"    $patch: delete\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	if len(diags) != 0 {
+		t.Errorf("expected $patch directive to be accepted, got: %+v", diags)
+	}
+}
+
+func TestValidateDoc_StrategicMergePatch_RealTypeErrorSurvives(t *testing.T) {
+	sch := compileInlineSchema(t, nodeLabelsSchema)
+	// A genuine object value (not a merge directive) must still fail.
+	body := "nodeLabels:\n  some-label:\n    nested: oops\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "/nodeLabels/some-label") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the real type error on a non-directive object to survive; got: %+v", diags)
+	}
+}
+
+// closedListSchema models a closed object with a list of closed objects, the
+// shape that turns mixed-in strategic-merge directive keys into
+// "additionalProperties" errors.
+const closedListSchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"containers": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {"name": {"type": "string"}}
+			}
+		}
+	}
+}`
+
+func TestValidateDoc_StrategicMergePatch_ListElementDeleteSuppressed(t *testing.T) {
+	sch := compileInlineSchema(t, closedListSchema)
+	// `$patch: delete` beside the element's identity field.
+	body := "containers:\n  - name: log-tailer\n    $patch: delete\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	if len(diags) != 0 {
+		t.Errorf("expected $patch list-element directive to be accepted, got: %+v", diags)
+	}
+}
+
+func TestValidateDoc_StrategicMergePatch_PrefixedDirectivesSuppressed(t *testing.T) {
+	sch := compileInlineSchema(t, closedListSchema)
+	// Sibling ordering/deletion directives carrying a target-field suffix.
+	body := "$setElementOrder/containers:\n  - name: a\n" +
+		"$deleteFromPrimitiveList/containers:\n  - b\n" +
+		"containers:\n  - name: a\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	if len(diags) != 0 {
+		t.Errorf("expected prefixed merge directives to be accepted, got: %+v", diags)
+	}
+}
+
+func TestValidateDoc_StrategicMergePatch_RealUnknownKeySurvives(t *testing.T) {
+	sch := compileInlineSchema(t, closedListSchema)
+	// A genuine typo mixed with a directive must still be reported.
+	body := "containers:\n  - name: a\n    $patch: delete\n    typo: x\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "typo") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the real unknown-key error to survive alongside a directive; got: %+v", diags)
+	}
+}
+
 func TestValidate_TypeMismatchProducesDiagnostic(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	repo := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))

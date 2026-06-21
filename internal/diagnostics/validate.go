@@ -106,6 +106,9 @@ func flattenValidationError(
 		if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
 			return protocol.Diagnostic{}, true
 		}
+		if strategicMergeDirective(doc, e) {
+			return protocol.Diagnostic{}, true
+		}
 		return protocol.Diagnostic{
 			Severity: ptr(protocol.DiagnosticSeverityError),
 			Source:   ptr(Source),
@@ -115,6 +118,9 @@ func flattenValidationError(
 		}, false
 	})
 }
+
+// keywordType is the jsonschema keyword for a type mismatch.
+const keywordType = "type"
 
 // noisePattern describes a false-positive validation error declaratively.
 // Fields are matched conjunctively; an empty string means "don't care".
@@ -154,12 +160,12 @@ func matchNoise(patterns []noisePattern, e *jsonschema.ValidationError) bool {
 var noisePatterns = []noisePattern{
 	// "got X, want null" — k8s anyOf[<type>, null] always fails the null
 	// branch when a value is present. Handled by the real sibling branch.
-	{Keyword: "type", Want: "null"},
+	{Keyword: keywordType, Want: "null"},
 
 	// "got number, want string" on k8s Quantity — the published schema types
 	// Quantity as a bare string, but the API server also accepts JSON numbers.
 	{
-		Keyword:    "type",
+		Keyword:    keywordType,
 		Got:        "number",
 		Want:       "string",
 		SchemaLike: func(url string) bool { return strings.HasSuffix(url, "/"+k8sQuantityDef) },
@@ -238,6 +244,52 @@ func FluxSubstituted(doc *ast.DocumentNode, e *jsonschema.ValidationError, opts 
 	}
 	v, ok := yamlast.StringValueAt(doc, Pointer(e.InstanceLocation))
 	return ok && strings.Contains(v, "${")
+}
+
+// strategicMergeDirective reports whether e is a false positive from a
+// Kubernetes/Talos strategic-merge-patch directive. These carry no schema data
+// and appear two ways: as a whole value replacing a typed field (a "type"
+// error, e.g. `{$patch: delete}` on a map[string]string), or as keys mixed into
+// a closed object (an "additionalProperties" error, e.g. a list element with
+// `$patch: delete`, or a sibling `$setElementOrder/<field>` list). Suppressed
+// only when every offending key is a directive, so real errors still fire.
+func strategicMergeDirective(doc *ast.DocumentNode, e *jsonschema.ValidationError) bool {
+	switch keyword(e) {
+	case keywordType:
+		keys, ok := yamlast.MappingKeysAt(doc, Pointer(e.InstanceLocation))
+		return ok && allMergeDirectives(keys)
+	case "additionalProperties":
+		k, ok := e.ErrorKind.(*kind.AdditionalProperties)
+		return ok && allMergeDirectives(k.Properties)
+	}
+	return false
+}
+
+// allMergeDirectives reports whether keys is non-empty and every entry is a
+// strategic-merge-patch directive key.
+func allMergeDirectives(keys []string) bool {
+	if len(keys) == 0 {
+		return false
+	}
+	for _, k := range keys {
+		if !isMergeDirectiveKey(k) {
+			return false
+		}
+	}
+	return true
+}
+
+// isMergeDirectiveKey reports whether k is a strategic-merge-patch directive
+// key. The bare directives ($patch, $retainKeys) match exactly; the others
+// carry a target field as a suffix ($setElementOrder/<field>,
+// $deleteFromPrimitiveList/<field>).
+func isMergeDirectiveKey(k string) bool {
+	switch k {
+	case "$patch", "$retainKeys":
+		return true
+	}
+	return strings.HasPrefix(k, "$setElementOrder/") ||
+		strings.HasPrefix(k, "$deleteFromPrimitiveList/")
 }
 
 // hasCustomTag reports whether the node at ptr carries one of the declared

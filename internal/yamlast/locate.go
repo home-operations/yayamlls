@@ -51,6 +51,27 @@ func TagAt(doc *ast.DocumentNode, ptr string) (string, bool) {
 	return tn.Start.Value, true
 }
 
+// MappingKeysAt returns the keys of the mapping node at ptr. ok is false when
+// ptr does not resolve or the node is not a mapping. Used to inspect a value
+// for marker-only mappings (e.g. a strategic-merge `{$patch: delete}`).
+func MappingKeysAt(doc *ast.DocumentNode, ptr string) (keys []string, ok bool) {
+	node, found := lookup(doc, ptr)
+	if !found {
+		return nil, false
+	}
+	switch n := node.(type) {
+	case *ast.MappingNode:
+		keys = make([]string, 0, len(n.Values))
+		for _, kv := range n.Values {
+			keys = append(keys, mapKeyString(kv.Key))
+		}
+		return keys, true
+	case *ast.MappingValueNode:
+		return []string{mapKeyString(n.Key)}, true
+	}
+	return nil, false
+}
+
 // LocateKey returns the range of the `key` token within the mapping at
 // parentPtr, for anchoring structural diagnostics (an unknown or missing
 // property) on a specific key line rather than the whole mapping. key is a
