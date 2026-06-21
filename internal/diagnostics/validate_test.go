@@ -275,6 +275,19 @@ func TestValidateDoc_StrategicMergePatch_PrefixedDirectivesSuppressed(t *testing
 	}
 }
 
+func TestValidateDoc_StrategicMergePatch_DirectiveOnlyListElementDropped(t *testing.T) {
+	sch := compileInlineSchema(t, closedListSchema)
+	// A standalone `{$patch: delete}` element is the whole marker: post-merge it
+	// is gone, so the projection validates even against a required-name item.
+	body := "containers:\n  - name: keep\n  - $patch: delete\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	if len(diags) != 0 {
+		t.Errorf("expected directive-only list element to be dropped, got: %+v", diags)
+	}
+}
+
 func TestValidateDoc_StrategicMergePatch_RealUnknownKeySurvives(t *testing.T) {
 	sch := compileInlineSchema(t, closedListSchema)
 	// A genuine typo mixed with a directive must still be reported.

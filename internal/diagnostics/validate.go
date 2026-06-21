@@ -72,6 +72,7 @@ func validateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string, opts
 			Range:    yamlast.LocateRange(doc, "", src),
 		}}
 	}
+	value = normalizeMergeDirectives(value)
 	if err := sch.Validate(value); err != nil {
 		var verr *jsonschema.ValidationError
 		if errors.As(err, &verr) {
@@ -104,9 +105,6 @@ func flattenValidationError(
 			return protocol.Diagnostic{}, true
 		}
 		if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
-			return protocol.Diagnostic{}, true
-		}
-		if strategicMergeDirective(doc, e) {
 			return protocol.Diagnostic{}, true
 		}
 		return protocol.Diagnostic{
@@ -246,32 +244,53 @@ func FluxSubstituted(doc *ast.DocumentNode, e *jsonschema.ValidationError, opts 
 	return ok && strings.Contains(v, "${")
 }
 
-// strategicMergeDirective reports whether e is a false positive from a
-// Kubernetes/Talos strategic-merge-patch directive. These carry no schema data
-// and appear two ways: as a whole value replacing a typed field (a "type"
-// error, e.g. `{$patch: delete}` on a map[string]string), or as keys mixed into
-// a closed object (an "additionalProperties" error, e.g. a list element with
-// `$patch: delete`, or a sibling `$setElementOrder/<field>` list). Suppressed
-// only when every offending key is a directive, so real errors still fire.
-func strategicMergeDirective(doc *ast.DocumentNode, e *jsonschema.ValidationError) bool {
-	switch keyword(e) {
-	case keywordType:
-		keys, ok := yamlast.MappingKeysAt(doc, Pointer(e.InstanceLocation))
-		return ok && allMergeDirectives(keys)
-	case "additionalProperties":
-		k, ok := e.ErrorKind.(*kind.AdditionalProperties)
-		return ok && allMergeDirectives(k.Properties)
+// normalizeMergeDirectives rewrites a decoded document to its post-merge shape
+// by applying Kubernetes/Talos strategic-merge-patch semantics, so validation
+// sees what the cluster will see rather than the patch source: a directive-only
+// mapping ({$patch: delete}) drops its owning map entry or sequence element,
+// and directive keys mixed beside real data ($patch, $retainKeys,
+// $setElementOrder/<field>, $deleteFromPrimitiveList/<field>) are stripped.
+// Projecting once covers every keyword a directive can produce, rather than
+// suppressing each error shape after the fact.
+//
+// NOTE: a $patch: delete on a schema-`required` entry leaves a spurious
+// `required` error (and dropping a sequence element shifts later indices). Both
+// are rare and are the signal to add a real patch-document mode that relaxes
+// `required` for overlays; intentionally not handled here.
+func normalizeMergeDirectives(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for k, child := range v {
+			if isMergeDirectiveKey(k) || mergeDirectiveOnly(child) {
+				continue
+			}
+			out[k] = normalizeMergeDirectives(child)
+		}
+		return out
+	case []any:
+		out := make([]any, 0, len(v))
+		for _, child := range v {
+			if mergeDirectiveOnly(child) {
+				continue
+			}
+			out = append(out, normalizeMergeDirectives(child))
+		}
+		return out
+	default:
+		return value
 	}
-	return false
 }
 
-// allMergeDirectives reports whether keys is non-empty and every entry is a
-// strategic-merge-patch directive key.
-func allMergeDirectives(keys []string) bool {
-	if len(keys) == 0 {
+// mergeDirectiveOnly reports whether v is a non-empty mapping built solely from
+// strategic-merge-patch directive keys (e.g. {$patch: delete}) — a deletion or
+// replacement marker, not data.
+func mergeDirectiveOnly(v any) bool {
+	m, ok := v.(map[string]any)
+	if !ok || len(m) == 0 {
 		return false
 	}
-	for _, k := range keys {
+	for k := range m {
 		if !isMergeDirectiveKey(k) {
 			return false
 		}
