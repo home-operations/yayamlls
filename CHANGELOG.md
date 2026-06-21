@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.10](https://github.com/home-operations/yayamlls/compare/0.1.9...0.1.10) (2026-06-21)
+
+
+### Bug Fixes
+
+* **deps:** update dependency typescript (6.0.3 → 6.0.3) ([#40](https://github.com/home-operations/yayamlls/issues/40)) ([1b13722](https://github.com/home-operations/yayamlls/commit/1b137226a6e038291f98fbd1c935dbdd0c04971a))
+* **deps:** update module github.com/home-operations/flate (v0.4.7 → v0.4.9) ([#70](https://github.com/home-operations/yayamlls/issues/70)) ([addb447](https://github.com/home-operations/yayamlls/commit/addb44758373048e04e1ead29be05370ffaa5261))
+* **diagnostics:** suppress strategic-merge-patch directive false positives ([e35e8d7](https://github.com/home-operations/yayamlls/commit/e35e8d791e85c825c289a2d2a044e48a7a5ed258))
+
+
+### Code Refactoring
+
+* **diagnostics:** validate post-merge projection of strategic-merge patches ([8828c6f](https://github.com/home-operations/yayamlls/commit/8828c6fe9b205d2d7c34e6d32a58f78d66f1f9d3))
+
 ## [0.1.9](https://github.com/home-operations/yayamlls/compare/0.1.8...0.1.9) (2026-06-19)
 
 
