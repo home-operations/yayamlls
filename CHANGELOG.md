@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.11](https://github.com/home-operations/yayamlls/compare/0.1.10...0.1.11) (2026-06-26)
+
+
+### Features
+
+* **deps:** update dependency vscode (1.125.0 → 1.126.0) ([#81](https://github.com/home-operations/yayamlls/issues/81)) ([fd6faa8](https://github.com/home-operations/yayamlls/commit/fd6faa8db2213453c82abc837dde8affb3a6eb9c))
+
+
+### Bug Fixes
+
+* **deps:** update dependency vscode-languageclient (10.0.0 → 10.0.1) ([#79](https://github.com/home-operations/yayamlls/issues/79)) ([cb158b8](https://github.com/home-operations/yayamlls/commit/cb158b85da99da5f48eb4b1821c8f9bb881ed1bb))
+
 ## [0.1.10](https://github.com/home-operations/yayamlls/compare/0.1.9...0.1.10) (2026-06-21)
 
 
