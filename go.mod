@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/home-operations/flate v0.4.9
+	github.com/home-operations/flate v0.4.10
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
@@ -107,7 +107,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/minio/minio-go/v7 v7.2.0 // indirect
+	github.com/minio/minio-go/v7 v7.2.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
