@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: editors/vscode
     permissions:
-      contents: write # upload the .vsix to the release
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -40,8 +40,6 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
-          # Disable caching: this job uploads a release artifact, so a cache
-          # poisoned from a fork PR could influence the published .vsix.
           package-manager-cache: false
 
       - name: Install dependencies
@@ -82,7 +80,5 @@ jobs:
       - name: Add wasm target
         run: rustup target add wasm32-wasip1
 
-      # Zed and Gram compile the extension locally at install time, so there is
-      # no prebuilt .wasm to release; this just verifies the crate still builds.
       - name: Build
         run: cargo build --release --locked --target wasm32-wasip1
