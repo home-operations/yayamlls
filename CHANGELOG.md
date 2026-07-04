@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.12](https://github.com/home-operations/yayamlls/compare/0.1.11...0.1.12) (2026-07-04)
+
+
+### Features
+
+* **ci:** goreleaser Pro — split/merge release matrix + versioned casks ([#91](https://github.com/home-operations/yayamlls/issues/91)) ([9e55d96](https://github.com/home-operations/yayamlls/commit/9e55d96912367c5271acec759878551828b3d64d))
+* **deps:** update dependency vscode (1.126.0 → 1.127.0) ([#89](https://github.com/home-operations/yayamlls/issues/89)) ([cbce5fd](https://github.com/home-operations/yayamlls/commit/cbce5fd3e7c113ef9026653111dc0b9d83bac278))
+* **deps:** update dependency vscode-languageclient (10.0.1 → 10.1.0) ([#90](https://github.com/home-operations/yayamlls/issues/90)) ([4a30e7f](https://github.com/home-operations/yayamlls/commit/4a30e7f714b8683a047e7c233a812688782d67a5))
+
+
+### Bug Fixes
+
+* **deps:** update dependency @types/node (24.13.2 → 24.13.2) ([#39](https://github.com/home-operations/yayamlls/issues/39)) ([97cd60b](https://github.com/home-operations/yayamlls/commit/97cd60b28dd71c1fbb1bcca5e87940a81de615d2))
+* **deps:** update module github.com/home-operations/flate (v0.4.9 → v0.4.10) ([#83](https://github.com/home-operations/yayamlls/issues/83)) ([45b3659](https://github.com/home-operations/yayamlls/commit/45b3659fd46d1ab750f6c0ac7385b5f173189c76))
+
 ## [0.1.11](https://github.com/home-operations/yayamlls/compare/0.1.10...0.1.11) (2026-06-26)
 
 
