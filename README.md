@@ -408,4 +408,8 @@ mise run lint
 mise run build
 ```
 
+## Releases
+
+Release artifacts (archives, the Homebrew cask, SBOMs, and Cosign signatures) are built and published with [GoReleaser Pro](https://goreleaser.com/pro/). If it's useful to your own projects, consider [sponsoring its author](https://github.com/sponsors/caarlos0).
+
 [flate]: https://github.com/home-operations/flate
