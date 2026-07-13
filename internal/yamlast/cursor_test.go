@@ -37,6 +37,29 @@ func TestLocateCursor_SequenceItemContinuation(t *testing.T) {
 	}
 }
 
+func TestLocateCursor_EmptyValueChild(t *testing.T) {
+	cases := []struct {
+		name        string
+		text        string
+		line, char  uint32
+		wantPointer string
+		wantIsKey   bool
+	}{
+		{"empty child (blank)", "spec:\n  exec:\n    \n", 2, 4, "/spec/exec", true},
+		{"empty child (typing)", "spec:\n  exec:\n    co\n", 2, 6, "/spec/exec", true},
+		{"empty grandchild", "spec:\n  exec:\n    command:\n      \n", 3, 6, "/spec/exec/command", true},
+		{"sibling stays put", "spec:\n  template:\n    foo: bar\n  \n", 3, 2, "/spec", true},
+	}
+	for _, c := range cases {
+		parsed := ForCursor(Parse([]byte(c.text)), int(c.line))
+		ctx := LocateCursor(parsed, c.text, protocol.Position{Line: c.line, Character: c.char})
+		if ctx.Pointer != c.wantPointer || ctx.IsKey != c.wantIsKey {
+			t.Errorf("%s: pointer=%q isKey=%v, want pointer=%q isKey=%v",
+				c.name, ctx.Pointer, ctx.IsKey, c.wantPointer, c.wantIsKey)
+		}
+	}
+}
+
 func TestPathToPointer(t *testing.T) {
 	cases := map[string]string{
 		"$":            "",

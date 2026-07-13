@@ -55,8 +55,10 @@ func LocateCursor(parsed *Parsed, text string, pos protocol.Position) CursorCont
 	ast.Walk(v, doc.Body)
 
 	ctx.Pointer = pathToPointer(v.best.GetPath())
-	if ctx.Pointer == "" {
-		ctx.Pointer = inferPathByIndent(text, int(pos.Line))
+	if ctx.Pointer == "" || cursorPastMappingKeys(v.best, v.col) {
+		if inferred := inferPathByIndent(text, int(pos.Line)); inferred != "" {
+			ctx.Pointer = inferred
+		}
 	}
 	if isKeyLine(text, pos) {
 		ctx.IsKey = true
@@ -129,6 +131,11 @@ func keyColumn(mv *ast.MappingValueNode) int {
 		return c
 	}
 	return 1
+}
+
+func cursorPastMappingKeys(best ast.Node, col int) bool {
+	m, ok := best.(*ast.MappingNode)
+	return ok && col > mappingEntryColumn(m)
 }
 
 // mappingEntryColumn reports the column a mapping's keys sit at, taken from its
