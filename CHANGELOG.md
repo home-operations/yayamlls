@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.13](https://github.com/home-operations/yayamlls/compare/0.1.12...0.1.13) (2026-07-13)
+
+
+### Features
+
+* **deps:** update dependency vscode (1.127.0 → 1.128.0) ([#97](https://github.com/home-operations/yayamlls/issues/97)) ([7cfc2f6](https://github.com/home-operations/yayamlls/commit/7cfc2f62d4e8ced05d84deb46e3342e6bacccd4b))
+* **deps:** update module golang.org/x/text (v0.38.0 → v0.39.0) ([#92](https://github.com/home-operations/yayamlls/issues/92)) ([f50eb81](https://github.com/home-operations/yayamlls/commit/f50eb8176a3b06455bf2d939ed10ebe16dce2d59))
+* **deps:** update module golang.org/x/text (v0.39.0 → v0.40.0) ([#100](https://github.com/home-operations/yayamlls/issues/100)) ([8e45d6a](https://github.com/home-operations/yayamlls/commit/8e45d6a127d64dd767aa9a871c00b598a66aabe6))
+
+
+### Bug Fixes
+
+* correctly pass ast when cursor is past mapping key ([cba5fc2](https://github.com/home-operations/yayamlls/commit/cba5fc21478d5797312d8c0e7b8e9212f34add3f))
+* **deps:** update dependency @types/node (24.13.2 → 24.13.3) ([#96](https://github.com/home-operations/yayamlls/issues/96)) ([e32801d](https://github.com/home-operations/yayamlls/commit/e32801d03eca4113ff275ae1fb92ee3370ab693a))
+
+
+### Documentation
+
+* credit GoReleaser Pro in the README ([#94](https://github.com/home-operations/yayamlls/issues/94)) ([ce8facb](https://github.com/home-operations/yayamlls/commit/ce8facb6d68d6d080ed91a1ef506f99abe25622d))
+
 ## [0.1.12](https://github.com/home-operations/yayamlls/compare/0.1.11...0.1.12) (2026-07-04)
 
 
