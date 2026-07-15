@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.14](https://github.com/home-operations/yayamlls/compare/0.1.13...0.1.14) (2026-07-15)
+
+
+### Bug Fixes
+
+* **lsp:** rework folding range logic ([#107](https://github.com/home-operations/yayamlls/issues/107)) ([decb1ba](https://github.com/home-operations/yayamlls/commit/decb1baaf412d39671e6e91e379fc3ea9d630e71))
+
 ## [0.1.13](https://github.com/home-operations/yayamlls/compare/0.1.12...0.1.13) (2026-07-13)
 
 
