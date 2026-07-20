@@ -22,11 +22,11 @@ Zed bundles `yaml-language-server`. To run `yayamlls` instead, in
 
 ```jsonc
 {
-    "languages": {
-        "YAML": {
-            "language_servers": ["yayamlls", "!yaml-language-server"],
-        },
+  "languages": {
+    "YAML": {
+      "language_servers": ["yayamlls", "!yaml-language-server"],
     },
+  },
 }
 ```
 
@@ -37,21 +37,19 @@ Pass server options under the `yayamlls` LSP key; they are forwarded verbatim as
 
 ```jsonc
 {
-    "lsp": {
-        "yayamlls": {
-            "binary": {
-                "path": "/usr/local/bin/yayamlls", // optional: skip the download
-            },
-            "initialization_options": {
-                "catalog": true,
-                "schemas": {
-                    "https://json.schemastore.org/github-workflow.json": [
-                        ".github/workflows/*.yml",
-                    ],
-                },
-            },
+  "lsp": {
+    "yayamlls": {
+      "binary": {
+        "path": "/usr/local/bin/yayamlls", // optional: skip the download
+      },
+      "initialization_options": {
+        "catalog": true,
+        "schemas": {
+          "https://json.schemastore.org/github-workflow.json": [".github/workflows/*.yml"],
         },
+      },
     },
+  },
 }
 ```
 
