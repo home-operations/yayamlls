@@ -21,7 +21,7 @@ lenses — is on by default. Disable it to run as a generic YAML language server
 
 ```yaml
 kubernetes:
-    enabled: false
+  enabled: false
 ```
 
 ## vs. redhat/yaml-language-server
@@ -147,9 +147,9 @@ it via **zed: install dev extension**). Since Zed bundles its own
 
 ```jsonc
 {
-    "languages": {
-        "YAML": { "language_servers": ["yayamlls", "!yaml-language-server"] },
-    },
+  "languages": {
+    "YAML": { "language_servers": ["yayamlls", "!yaml-language-server"] },
+  },
 }
 ```
 
@@ -161,17 +161,17 @@ allowed`), so the settings-only alternative is to override the bundled
 ```jsonc
 // ~/.config/zed/settings.json
 {
-    "lsp": {
-        "yaml-language-server": {
-            "binary": {
-                "ignore_system_version": true,
-                "path": "yayamlls",
-            },
-            "initialization_options": {
-                "catalog": true,
-            },
-        },
+  "lsp": {
+    "yaml-language-server": {
+      "binary": {
+        "ignore_system_version": true,
+        "path": "yayamlls",
+      },
+      "initialization_options": {
+        "catalog": true,
+      },
     },
+  },
 }
 ```
 
@@ -218,14 +218,14 @@ the binary on `$PATH`, then:
 ```jsonc
 // opencode.json
 {
-    "$schema": "https://opencode.ai/config.json",
-    "lsp": {
-        "yaml-ls": { "disabled": true },
-        "yayamlls": {
-            "command": ["yayamlls"],
-            "extensions": [".yaml", ".yml"]
-        }
-    }
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": {
+    "yaml-ls": { "disabled": true },
+    "yayamlls": {
+      "command": ["yayamlls"],
+      "extensions": [".yaml", ".yml"],
+    },
+  },
 }
 ```
 
@@ -264,10 +264,10 @@ yayamlls --log-file /tmp/yayamlls.log -v 2
 
 ```yaml
 schemas:
-    "https://json.schemastore.org/github-workflow.json":
-        - ".github/workflows/*.yml"
-    "./schemas/local.json":
-        - "k8s/**/*.yaml"
+  "https://json.schemastore.org/github-workflow.json":
+    - ".github/workflows/*.yml"
+  "./schemas/local.json":
+    - "k8s/**/*.yaml"
 
 catalog: true
 catalogUrl: ""
@@ -341,7 +341,7 @@ Same shape works via `initializationOptions` or
 Comments mute diagnostics so the language server stops reporting them:
 
 ```yaml
-age: not-a-number  # yayamlls-disable-line
+age: not-a-number # yayamlls-disable-line
 
 # yayamlls-disable-line
 age: not-a-number

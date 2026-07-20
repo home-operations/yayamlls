@@ -43,17 +43,17 @@ Lives at the workspace root and is the lowest-precedence settings layer (the
 editor/plugin can override it). Common keys:
 
 ```yaml
-catalog: true               # use the SchemaStore catalog for well-known files
-catalogUrl: https://...     # custom catalog
-kubernetes:                 # apiVersion+kind detection + Flux rendering
-  enabled: true             #   (on by default; set false for generic YAML)
-schemas:                    # schema URL/path -> the file globs it applies to
+catalog: true # use the SchemaStore catalog for well-known files
+catalogUrl: https://... # custom catalog
+kubernetes: # apiVersion+kind detection + Flux rendering
+  enabled: true #   (on by default; set false for generic YAML)
+schemas: # schema URL/path -> the file globs it applies to
   "https://example.com/my-schema.json":
     - "clusters/**/*.yaml"
-fluxSubstitutions: true     # treat ${VAR} Flux postBuild substitutions as valid
-customTags: ["!secret"]     # extra YAML tags to accept without error
-renderDebounceMs: 200       # debounce for the Flux render pipeline
-renderTimeoutMs: 30000      # max time a single render may run (deadline)
+fluxSubstitutions: true # treat ${VAR} Flux postBuild substitutions as valid
+customTags: ["!secret"] # extra YAML tags to accept without error
+renderDebounceMs: 200 # debounce for the Flux render pipeline
+renderTimeoutMs: 30000 # max time a single render may run (deadline)
 ```
 
 See `.yayamlls.yaml.example` in the repo root for the full set.
@@ -65,9 +65,10 @@ suppress only when the schema is wrong or a value is intentionally
 non-conformant.
 
 ```yaml
-foo: bar  # yayamlls-disable-line   # suppresses this line
+foo: bar # yayamlls-disable-line   # suppresses this line
 # yayamlls-disable-line
-baz: qux                            # suppresses the line below the directive
+baz: qux # suppresses the line below the directive
+
 
 # yayamlls-disable
 # ... suppressed block ...
@@ -82,7 +83,7 @@ The directive must be the first token of the comment.
 
 With `kubernetes` enabled, opening a Flux `HelmRelease` or `Kustomization`
 renders the resource (via the embedded `flate` engine) and surfaces schema
-violations from the *rendered* manifests back on the source document, tagged
+violations from the _rendered_ manifests back on the source document, tagged
 `[rendered <kind>/<name> @ <jsonptr>]`. So a diagnostic may point at the source
 file but describe a problem in the rendered output — read the tag to tell which.
 

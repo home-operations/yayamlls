@@ -3,15 +3,15 @@
 Connects the `yayamlls` language server to [Claude Code](https://claude.com/claude-code).
 Bundles three components:
 
-| Component | What it does |
-| --------- | ------------ |
-| **LSP server** (`.lsp.json`) | Registers `yayamlls` for live diagnostics, hover, and completion on `.yaml`/`.yml` files. |
-| **Hook** (`hooks/hooks.json`) | Runs `yayamlls validate` after each YAML edit and feeds error-severity diagnostics back to Claude. |
-| **Skill** (`skills/yaml/`) | Documents schema resolution order, `.yayamlls.yaml`, suppressions, and Flux rendering. Invokable as `/yayamlls:yaml`. |
+| Component                     | What it does                                                                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **LSP server** (`.lsp.json`)  | Registers `yayamlls` for live diagnostics, hover, and completion on `.yaml`/`.yml` files.                             |
+| **Hook** (`hooks/hooks.json`) | Runs `yayamlls validate` after each YAML edit and feeds error-severity diagnostics back to Claude.                    |
+| **Skill** (`skills/yaml/`)    | Documents schema resolution order, `.yayamlls.yaml`, suppressions, and Flux rendering. Invokable as `/yayamlls:yaml`. |
 
 ## Prerequisite: install the binary
 
-A Claude Code LSP/hook plugin configures *how* Claude Code reaches a language
+A Claude Code LSP/hook plugin configures _how_ Claude Code reaches a language
 server — it does **not** ship the binary. Put `yayamlls` on your `$PATH` first:
 
 ```sh
