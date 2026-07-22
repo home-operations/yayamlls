@@ -103,6 +103,6 @@
     "onLanguage:yaml"
   ],
   "engines": {
-    "vscode": "^1.129.1"
+    "vscode": "^1.130.0"
   }
 }
