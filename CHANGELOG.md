@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.15](https://github.com/home-operations/yayamlls/compare/0.1.14...0.1.15) (2026-07-22)
+
+
+### Features
+
+* **deps:** update dependency vscode (1.128.0 → 1.129.1) ([#105](https://github.com/home-operations/yayamlls/issues/105)) ([dab05bf](https://github.com/home-operations/yayamlls/commit/dab05bf067fd0deeb4cf5d8add3a5f7de34c6864))
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/home-operations/flate (v0.4.10 → v0.4.12) ([#111](https://github.com/home-operations/yayamlls/issues/111)) ([30f8362](https://github.com/home-operations/yayamlls/commit/30f8362d18ca90df5dad672d63b01b6d9023bdf2))
+
 ## [0.1.14](https://github.com/home-operations/yayamlls/compare/0.1.13...0.1.14) (2026-07-15)
 
 
