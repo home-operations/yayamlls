@@ -7,3 +7,8 @@ rules:
   cache-poisoning:
     ignore:
       - goreleaser.yaml
+  # The action installs yayamlls into its own directory (inputs.bindir, else a
+  # RUNNER_TOOL_CACHE subpath) and must put it on PATH for later steps.
+  github-env:
+    ignore:
+      - action.yml
