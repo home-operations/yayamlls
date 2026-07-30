@@ -305,7 +305,7 @@ func (s *Server) applySettingsRaw(raw json.RawMessage) {
 		return
 	}
 	s.settingsMu.Lock()
-	s.overrides = config.Merge(s.overrides, settings)
+	s.overrides = settings
 	s.settingsMu.Unlock()
 	s.applyLayers()
 }
