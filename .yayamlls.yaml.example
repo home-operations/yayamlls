@@ -16,8 +16,9 @@ catalog: true
 #   enabled: false
 #   # Override the auto-detect URL template. Placeholders:
 #   # {group}, {groupSeg}, {groupFirst}, {groupFirstSeg}, {kind}, {kindLower},
-#   # {version}, {versionLower}.
-#   # schemaUrl: "https://schemas.example.com/{groupSeg}{kindLower}_{versionLower}.json"
+#   # {version}, {versionLower}. Expression syntax (shell-like):
+#   # {var:-word}, {var:+word}.
+#   # schemaUrl: "https://schemas.example.com/{group:-core}/{kindLower}_{versionLower}.json"
 
 # Per-renderer config. Defaults shown — only set when overriding.
 #
