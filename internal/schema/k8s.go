@@ -10,6 +10,14 @@ const DefaultK8sSchemaURL = "https://k8s-schemas.home-operations.com/" +
 
 var exprRe = regexp.MustCompile(`\{([^}]+)\}`)
 
+func varsReplacer(m map[string]string) *strings.Replacer {
+	args := make([]string, 0, len(m)*2)
+	for k, v := range m {
+		args = append(args, "{"+k+"}", v)
+	}
+	return strings.NewReplacer(args...)
+}
+
 // BuildK8sURL renders a URL template against a GVK. Supported placeholders:
 //
 //	{group}         full api group, "" for core
@@ -74,15 +82,6 @@ func BuildK8sURL(template, group, version, kind string) string {
 		return match
 	})
 
-	r := strings.NewReplacer(
-		"{group}", group,
-		"{groupSeg}", groupSeg,
-		"{groupFirst}", groupFirst,
-		"{groupFirstSeg}", groupFirstSeg,
-		"{kind}", strings.ToLower(kind),
-		"{kindLower}", strings.ToLower(kind),
-		"{version}", strings.ToLower(version),
-		"{versionLower}", strings.ToLower(version),
-	)
+	r := varsReplacer(vars)
 	return r.Replace(template)
 }
