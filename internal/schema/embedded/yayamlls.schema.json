@@ -32,7 +32,7 @@
         },
         "schemaUrl": {
           "type": "string",
-          "description": "URL template for Kubernetes schema lookup. Placeholders: {group}, {groupSeg}, {groupFirst}, {groupFirstSeg}, {kind}, {version}. Expression syntax (shell-like): {var:-word}, {var:+word}, {var@U}, {var@L}."
+          "description": "URL template for Kubernetes schema lookup. Placeholders: {group}, {groupFirst}, {kind}, {version}. Expression syntax (shell-like): {var:-word}, {var:+word}, {var@U}, {var@L}."
         }
       }
     },

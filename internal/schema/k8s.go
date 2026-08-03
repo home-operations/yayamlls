@@ -21,13 +21,13 @@ func varsReplacer(m map[string]string) *strings.Replacer {
 // BuildK8sURL renders a URL template against a GVK. Supported placeholders:
 //
 //	{group}         full api group, "" for core
-//	{groupSeg}      "<group>/" or ""
 //	{groupFirst}    first DNS label of the group
-//	{groupFirstSeg} "<groupFirst>-" or ""
 //	{kind}          the resource kind
 //	{version}       the api version
 //	{kindLower}     legacy alias for {kind@L}
 //	{versionLower}  legacy alias for {version@L}
+//	{groupSeg}      legacy alias for {group}{group:+/}
+//	{groupFirstSeg} legacy alias for {groupFirst}{groupFirst:+-}
 //
 // Expression syntax (shell-like parameter expansion):
 //

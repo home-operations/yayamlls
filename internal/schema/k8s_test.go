@@ -22,7 +22,7 @@ func TestBuildK8sURL_DefaultCoreResource(t *testing.T) {
 }
 
 func TestBuildK8sURL_TemplatePlaceholders(t *testing.T) {
-	tmpl := "https://schemas.example.com/{groupSeg}{kind@L}_{version@L}.json"
+	tmpl := "https://schemas.example.com/{group}{group:+/}{kind@L}_{version@L}.json"
 	got := BuildK8sURL(tmpl, "helm.toolkit.fluxcd.io", "v2", "HelmRelease")
 	want := "https://schemas.example.com/helm.toolkit.fluxcd.io/helmrelease_v2.json"
 	if got != want {
@@ -31,7 +31,7 @@ func TestBuildK8sURL_TemplatePlaceholders(t *testing.T) {
 }
 
 func TestBuildK8sURL_YannhLayoutViaTemplate(t *testing.T) {
-	tmpl := "https://yannh.example/{kind@L}-{groupFirstSeg}{version@L}.json"
+	tmpl := "https://yannh.example/{kind@L}-{groupFirst}{groupFirst:+-}{version@L}.json"
 	if got := BuildK8sURL(tmpl, "", "v1", "Pod"); got != "https://yannh.example/pod-v1.json" {
 		t.Errorf("core: got %q", got)
 	}
@@ -331,5 +331,67 @@ func TestBuildK8sURL_LegacyVarsMatchOperators(t *testing.T) {
 	operators := BuildK8sURL("{kind@L}_{version@L}", "apps", "V1Beta1", "Deployment")
 	if legacy != operators {
 		t.Errorf("legacy %q != operator form %q", legacy, operators)
+	}
+}
+
+func TestBuildK8sURL_LegacySegVars(t *testing.T) {
+	tests := []struct {
+		name  string
+		tmpl  string
+		group string
+		want  string
+	}{
+		{
+			name: "groupSeg core",
+			tmpl: "{groupSeg}",
+			want: "",
+		},
+		{
+			name:  "groupSeg grouped",
+			tmpl:  "{groupSeg}",
+			group: "apps",
+			want:  "apps/",
+		},
+		{
+			name:  "groupSeg dotted",
+			tmpl:  "{groupSeg}",
+			group: "rbac.authorization.k8s.io",
+			want:  "rbac.authorization.k8s.io/",
+		},
+		{
+			name: "groupFirstSeg core",
+			tmpl: "{groupFirstSeg}",
+			want: "",
+		},
+		{
+			name:  "groupFirstSeg grouped",
+			tmpl:  "{groupFirstSeg}",
+			group: "apps",
+			want:  "apps-",
+		},
+		{
+			name:  "groupFirstSeg dotted",
+			tmpl:  "{groupFirstSeg}",
+			group: "rbac.authorization.k8s.io",
+			want:  "rbac-",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := BuildK8sURL(tc.tmpl, tc.group, "v1", "Resource"); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuildK8sURL_LegacySegVarsMatchComposition(t *testing.T) {
+	for _, group := range []string{"", "apps", "rbac.authorization.k8s.io"} {
+		if got, want := BuildK8sURL("{groupSeg}", group, "v1", "Resource"), BuildK8sURL("{group}{group:+/}", group, "v1", "Resource"); got != want {
+			t.Errorf("group %q: {groupSeg} %q != {group}{group:+/} %q", group, got, want)
+		}
+		if got, want := BuildK8sURL("{groupFirstSeg}", group, "v1", "Resource"), BuildK8sURL("{groupFirst}{groupFirst:+-}", group, "v1", "Resource"); got != want {
+			t.Errorf("group %q: {groupFirstSeg} %q != {groupFirst}{groupFirst:+-} %q", group, got, want)
+		}
 	}
 }

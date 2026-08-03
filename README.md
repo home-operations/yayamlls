@@ -274,8 +274,7 @@ catalogUrl: ""
 
 # Optional. Kubernetes apiVersion+kind auto-detect (on by default). Set
 # enabled: false to run as a generic YAML language server. schemaUrl overrides
-# the lookup template; placeholders: {group}, {groupSeg}, {groupFirst},
-# {groupFirstSeg}, {kind}, {version}.
+# the lookup template; placeholders: {group}, {groupFirst}, {kind}, {version}.
 # Expression syntax (shell-like): {var:-word}, {var:+word}, {var@U}, {var@L}.
 # kubernetes:
 #   enabled: false
