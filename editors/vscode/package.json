@@ -79,7 +79,7 @@
         "yayamlls.kubernetes.schemaUrl": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Override the Kubernetes auto-detect URL template. Placeholders: `{group}`, `{groupSeg}`, `{kind}`, `{kindLower}`, `{version}`, `{versionLower}`, etc."
+          "markdownDescription": "Override the Kubernetes auto-detect URL template. Placeholders: `{group}`, `{groupSeg}`, `{groupFirst}`, `{groupFirstSeg}`, `{kind}`, `{kindLower}`, `{version}`, `{versionLower}`, etc. Expression syntax: `{var:-word}`, `{var:+word}`."
         },
         "yayamlls.flate.enabled": {
           "type": "boolean",
