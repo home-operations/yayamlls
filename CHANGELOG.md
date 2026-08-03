@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.1.15](https://github.com/home-operations/yayamlls/compare/0.1.14...0.1.15) (2026-08-03)
+
+
+### Features
+
+* add parameter expressions for k8s url formatting ([#141](https://github.com/home-operations/yayamlls/issues/141)) ([2da9490](https://github.com/home-operations/yayamlls/commit/2da9490d56ae16e91e3ef2ee4a4241200b89d6a4))
+* **deps:** update dependency vscode (1.128.0 → 1.129.1) ([#105](https://github.com/home-operations/yayamlls/issues/105)) ([dab05bf](https://github.com/home-operations/yayamlls/commit/dab05bf067fd0deeb4cf5d8add3a5f7de34c6864))
+
+
+### Bug Fixes
+
+* **ci:** fail the merge gate on cancelled jobs, and key the lint cache on the toolchain ([#127](https://github.com/home-operations/yayamlls/issues/127)) ([e3bcf66](https://github.com/home-operations/yayamlls/commit/e3bcf6609e0a9f572a174cbc8b08969f5f6a0e69))
+* **deps:** update module github.com/home-operations/flate (v0.4.10 → v0.4.12) ([#111](https://github.com/home-operations/yayamlls/issues/111)) ([30f8362](https://github.com/home-operations/yayamlls/commit/30f8362d18ca90df5dad672d63b01b6d9023bdf2))
+* **go:** update module go (1.26.4 → 1.26.5) ([#139](https://github.com/home-operations/yayamlls/issues/139)) ([b14ca0a](https://github.com/home-operations/yayamlls/commit/b14ca0a0ac68de238725e9c744a3331b0c4a3e7a))
+* **vscode:** avoid default settings shadowing .yayamlls.yaml settings ([#128](https://github.com/home-operations/yayamlls/issues/128)) ([5ee44d8](https://github.com/home-operations/yayamlls/commit/5ee44d823f78cae8d1629bcd5d8a3f36f2a10453))
+
+
+### Documentation
+
+* add AGENTS.md with Go conventions ([#133](https://github.com/home-operations/yayamlls/issues/133)) ([e34c1cb](https://github.com/home-operations/yayamlls/commit/e34c1cb95ea2638cea0fa1e6093f0ae63dfd60a5))
+
+
+### Styles
+
+* indent markdown at 2 to match embedded yaml ([#112](https://github.com/home-operations/yayamlls/issues/112)) ([057f150](https://github.com/home-operations/yayamlls/commit/057f15023dab205566f7549812fba7843f58db59))
+
+
+### Build System
+
+* **mise:** add actionlint and refresh the lockfile ([#119](https://github.com/home-operations/yayamlls/issues/119)) ([7fda620](https://github.com/home-operations/yayamlls/commit/7fda62097f920056b9d0485fc3cccd41c54d8790))
+
+
+### Continuous Integration
+
+* gate pull requests on Build Success and share goreleaser via workflow_call ([#118](https://github.com/home-operations/yayamlls/issues/118)) ([62a9231](https://github.com/home-operations/yayamlls/commit/62a923124a8a4c4fca262dc9d93fc7567e6437eb))
+* **github-action:** Update action actions/checkout (v7.0.0 → v7.0.1) ([43474cd](https://github.com/home-operations/yayamlls/commit/43474cdf9ee1f799b320249d0fb73459e9bffb86))
+* **github-action:** Update action actions/stale (v10.4.0 → v11.0.0) ([#129](https://github.com/home-operations/yayamlls/issues/129)) ([8bbc2d8](https://github.com/home-operations/yayamlls/commit/8bbc2d8383846a55494eb05b352d6ff67dd8aacc))
+* **github-action:** Update action docker/github-builder (v1.13.0 → v1.14.0) ([496a4c3](https://github.com/home-operations/yayamlls/commit/496a4c37c0bc8df10fd2d13d7caedc1c64d5dc4a))
+* **github-action:** Update action docker/github-builder (v1.14.0 → v1.15.0) ([#126](https://github.com/home-operations/yayamlls/issues/126)) ([93f7f69](https://github.com/home-operations/yayamlls/commit/93f7f6906954df173fbd7b49b3a3755d95648c23))
+* **github-action:** Update action home-operations/.github/actions/workflow-lint (v1.0.2 → v1.0.3) ([#138](https://github.com/home-operations/yayamlls/issues/138)) ([1accef4](https://github.com/home-operations/yayamlls/commit/1accef4bfff7f7e06388fef9f5d00774a06d53ce))
+* **github-action:** Update action jdx/mise-action (v4.2.0 → v4.2.1) ([3888031](https://github.com/home-operations/yayamlls/commit/388803182f55a5794ea5839db381ab74b049a00d))
+* **github-action:** Update action jdx/mise-action (v4.2.1 → v4.2.2) ([#122](https://github.com/home-operations/yayamlls/issues/122)) ([7def6cc](https://github.com/home-operations/yayamlls/commit/7def6cc501a682d2dc604cc8bc387c553ebf4f37))
+* **github-action:** Update action jdx/mise-action (v4.2.2 → v4.2.3) ([#124](https://github.com/home-operations/yayamlls/issues/124)) ([be9552c](https://github.com/home-operations/yayamlls/commit/be9552cf3f731335b04bab1261d39506b7e044fd))
+* ignore github-env for the installer action ([#121](https://github.com/home-operations/yayamlls/issues/121)) ([0ffc483](https://github.com/home-operations/yayamlls/commit/0ffc4833b645a6df8ecd43d135fcf35894d190e4))
+* lint workflows with the shared composite action ([#120](https://github.com/home-operations/yayamlls/issues/120)) ([d8d6aa7](https://github.com/home-operations/yayamlls/commit/d8d6aa75503b799119415fca387e09b6c5bb1a8b))
+* **renovate:** reactive dashboard + config runs in one workflow ([#116](https://github.com/home-operations/yayamlls/issues/116)) ([360be97](https://github.com/home-operations/yayamlls/commit/360be97258c9413b28d8b5da13b08b9a6ec4028b))
+* skip release-please churn and stop cancelling main runs ([#109](https://github.com/home-operations/yayamlls/issues/109)) ([96f9a64](https://github.com/home-operations/yayamlls/commit/96f9a64ff847f20ee702434563d331bb33f0b054))
+* skip release-please version-bump PRs in checks ([#117](https://github.com/home-operations/yayamlls/issues/117)) ([949c735](https://github.com/home-operations/yayamlls/commit/949c735a387cc0e6e36210e2fe2450a8255c3b0c))
+* update workflow-lint and use self-repository syntax ([#135](https://github.com/home-operations/yayamlls/issues/135)) ([85d2da6](https://github.com/home-operations/yayamlls/commit/85d2da6d624ec0ebdaf6f328244f730e05139517))
+* wire govulncheck into mise and CI ([#137](https://github.com/home-operations/yayamlls/issues/137)) ([f1fb30c](https://github.com/home-operations/yayamlls/commit/f1fb30c2a0af23a6fdaa57e1220e0233f214b9dc))
+
+
+### Miscellaneous Chores
+
+* **mise:** prune lockfile to used platforms ([#136](https://github.com/home-operations/yayamlls/issues/136)) ([8288de5](https://github.com/home-operations/yayamlls/commit/8288de5823099b95e23c004b3445bd103c27ed40))
+* **mise:** Update tool oxfmt (0.59.0 → 0.60.0) ([#114](https://github.com/home-operations/yayamlls/issues/114)) ([c9515af](https://github.com/home-operations/yayamlls/commit/c9515afbef3cbcce9541070484512ca3ef18d4b7))
+* **mise:** Update tool oxfmt (0.60.0 → 0.61.0) ([#123](https://github.com/home-operations/yayamlls/issues/123)) ([1b0dd47](https://github.com/home-operations/yayamlls/commit/1b0dd47c442a1003d76da5cfb63c7cd5ade84939))
+* **mise:** Update tool zizmor (1.27.0 → 1.28.0) ([#113](https://github.com/home-operations/yayamlls/issues/113)) ([6e53dd4](https://github.com/home-operations/yayamlls/commit/6e53dd41ab5fea231b69848514b2823ee5454765))
+* **mise:** Update tool zizmor (1.28.0 → 1.29.0) ([#134](https://github.com/home-operations/yayamlls/issues/134)) ([85942ec](https://github.com/home-operations/yayamlls/commit/85942ec39edec86b2c3d2fdc6821e4b46f581c1a))
+* **npm:** lock file maintenance dependency (npm) ([#130](https://github.com/home-operations/yayamlls/issues/130)) ([582dc17](https://github.com/home-operations/yayamlls/commit/582dc173cdcc709b9640d829c2b5fc4d204c2798))
+* **release-please:** standardize the release pull request title pattern ([#132](https://github.com/home-operations/yayamlls/issues/132)) ([01deadd](https://github.com/home-operations/yayamlls/commit/01deadd43ddda515b3932ba3d34c25de672814f3))
+* **rust:** lock file maintenance crate (cargo) ([#131](https://github.com/home-operations/yayamlls/issues/131)) ([4ee8fed](https://github.com/home-operations/yayamlls/commit/4ee8fed180c87ebbf6e267ed607d93a618978fbc))
+* standardize release-please changelog sections ([#125](https://github.com/home-operations/yayamlls/issues/125)) ([4fa6f24](https://github.com/home-operations/yayamlls/commit/4fa6f24ea7af4c6e5c7ab49453843a7fe655347d))
+
 ## [0.1.14](https://github.com/home-operations/yayamlls/compare/0.1.13...0.1.14) (2026-07-15)
 
 
