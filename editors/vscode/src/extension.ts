@@ -1,6 +1,17 @@
 import * as fs from "fs/promises";
-import { commands, ExtensionContext, LogOutputChannel, window, workspace } from "vscode";
-import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
+import {
+  commands,
+  ExtensionContext,
+  LogOutputChannel,
+  window,
+  workspace,
+  WorkspaceConfiguration,
+} from "vscode";
+import {
+  LanguageClient,
+  LanguageClientOptions,
+  ServerOptions,
+} from "vscode-languageclient/node";
 import { ensureBinary } from "./download";
 
 const YAMLLS_REPO = "home-operations/yayamlls";
@@ -8,23 +19,44 @@ const YAMLLS_REPO = "home-operations/yayamlls";
 let client: LanguageClient | undefined;
 let output: LogOutputChannel;
 
-/** Build the server's initializationOptions from `yayamlls.*` settings. */
-function initializationOptions() {
+function explicit<T>(cfg: WorkspaceConfiguration, key: string): T | undefined {
+  const info = cfg.inspect<T>(key);
+  if (!info) {
+    return undefined;
+  }
+  if (
+    info.globalValue !== undefined ||
+    info.workspaceValue !== undefined ||
+    info.workspaceFolderValue !== undefined
+  ) {
+    return cfg.get<T>(key);
+  }
+  return undefined;
+}
+
+/** Build settings from `yayamlls.*` config, including only explicitly-set values. */
+function buildSettings() {
   const cfg = workspace.getConfiguration("yayamlls");
-  const opts: Record<string, unknown> = {
-    catalog: cfg.get<boolean>("catalog", true),
-    schemas: cfg.get<object>("schemas", {}),
-  };
-  const catalogUrl = cfg.get<string>("catalogUrl", "");
-  if (catalogUrl) {
+  const opts: Record<string, unknown> = {};
+  const catalog = explicit<boolean>(cfg, "catalog");
+  if (catalog !== undefined) {
+    opts.catalog = catalog;
+  }
+  const schemas = explicit<object>(cfg, "schemas");
+  if (schemas !== undefined) {
+    opts.schemas = schemas;
+  }
+  const catalogUrl = explicit<string>(cfg, "catalogUrl");
+  if (catalogUrl !== undefined) {
     opts.catalogUrl = catalogUrl;
   }
-  const schemaUrl = cfg.get<string>("kubernetes.schemaUrl", "");
-  if (schemaUrl) {
+  const schemaUrl = explicit<string>(cfg, "kubernetes.schemaUrl");
+  if (schemaUrl !== undefined) {
     opts.kubernetes = { schemaUrl };
   }
-  if (!cfg.get<boolean>("flate.enabled", true)) {
-    opts.renderers = { flate: { enabled: false } };
+  const flateEnabled = explicit<boolean>(cfg, "flate.enabled");
+  if (flateEnabled !== undefined) {
+    opts.renderers = { flate: { enabled: flateEnabled } };
   }
   return opts;
 }
@@ -56,12 +88,41 @@ async function startClient(context: ExtensionContext): Promise<void> {
   };
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "yaml" }],
-    initializationOptions: initializationOptions(),
-    synchronize: { configurationSection: "yayamlls" },
+    initializationOptions: buildSettings(),
     outputChannel: output,
+    middleware: {
+      workspace: {
+        configuration: async (params) => {
+          const result: unknown[] = [];
+          for (const item of params.items) {
+            if (item.section === "yayamlls") {
+              result.push(buildSettings());
+            } else {
+              result.push(null);
+            }
+          }
+          return result;
+        },
+      },
+    },
   };
-  client = new LanguageClient("yayamlls", "yayamlls", serverOptions, clientOptions);
+  client = new LanguageClient(
+    "yayamlls",
+    "yayamlls",
+    serverOptions,
+    clientOptions,
+  );
   await client.start();
+
+  // Push settings to the server when yayamlls.* config changes.
+  context.subscriptions.push(
+    workspace.onDidChangeConfiguration((e) => {
+      if (!e.affectsConfiguration("yayamlls") || !client) return;
+      client.sendNotification("workspace/didChangeConfiguration", {
+        settings: buildSettings(),
+      });
+    }),
+  );
 }
 
 export async function activate(context: ExtensionContext): Promise<void> {
