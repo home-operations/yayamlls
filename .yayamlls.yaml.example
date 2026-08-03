@@ -15,10 +15,10 @@ catalog: true
 # kubernetes:
 #   enabled: false
 #   # Override the auto-detect URL template. Placeholders:
-#   # {group}, {groupSeg}, {groupFirst}, {groupFirstSeg}, {kind}, {kindLower},
-#   # {version}, {versionLower}. Expression syntax (shell-like):
-#   # {var:-word}, {var:+word}.
-#   # schemaUrl: "https://schemas.example.com/{group:-core}/{kindLower}_{versionLower}.json"
+#   # {group}, {groupSeg}, {groupFirst}, {groupFirstSeg}, {kind}, {version}.
+#   # Expression syntax (shell-like):
+#   # {var:-word}, {var:+word}, {var@U}, {var@L}.
+#   # schemaUrl: "https://schemas.example.com/{group:-core}/{kind@L}_{version@L}.json"
 
 # Per-renderer config. Defaults shown — only set when overriding.
 #

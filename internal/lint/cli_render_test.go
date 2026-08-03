@@ -40,7 +40,7 @@ func renderWorkspace(t *testing.T) string {
 	}`
 	mustWrite(t, filepath.Join(root, "fakekind.json"), schema)
 	mustWrite(t, filepath.Join(root, ".yayamlls.yaml"),
-		"catalog: false\nkubernetes:\n  schemaUrl: \"file://"+filepath.Join(root, "{kindLower}.json")+"\"\n")
+		"catalog: false\nkubernetes:\n  schemaUrl: \"file://"+filepath.Join(root, "{kind@L}.json")+"\"\n")
 	return root
 }
 
