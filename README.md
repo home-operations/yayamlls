@@ -13,7 +13,7 @@ Per-document schema resolution, highest priority first:
 
 Multi-doc files validate each document against its own schema. The
 default `kubernetes.schemaUrl` is
-`https://k8s-schemas.home-operations.com/{group:-core}/{kindLower}_{versionLower}.json`;
+`https://k8s-schemas.home-operations.com/{group:-core}/{kind@L}_{version@L}.json`;
 override in `.yayamlls.yaml` to point elsewhere. 404s are silently skipped.
 
 Kubernetes support — apiVersion+kind detection, Flux rendering, and code
@@ -274,12 +274,11 @@ catalogUrl: ""
 
 # Optional. Kubernetes apiVersion+kind auto-detect (on by default). Set
 # enabled: false to run as a generic YAML language server. schemaUrl overrides
-# the lookup template; placeholders: {group}, {groupSeg}, {groupFirst},
-# {groupFirstSeg}, {kind}, {kindLower}, {version}, {versionLower}.
-# Expression syntax (shell-like): {var:-word}, {var:+word}.
+# the lookup template; placeholders: {group}, {groupFirst}, {kind}, {version}.
+# Expression syntax (shell-like): {var:-word}, {var:+word}, {var@U}, {var@L}.
 # kubernetes:
 #   enabled: false
-#   schemaUrl: "https://schemas.example.com/{group:-core}/{kindLower}_{versionLower}.json"
+#   schemaUrl: "https://schemas.example.com/{group:-core}/{kind@L}_{version@L}.json"
 
 # Optional. Defaults shown.
 # renderers:

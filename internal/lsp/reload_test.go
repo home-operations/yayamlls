@@ -70,7 +70,7 @@ func TestSettings_OverridesSurviveWorkspaceFolderChange(t *testing.T) {
 
 	// A client pushes kubernetes.schemaUrl via didChangeConfiguration.
 	if err := s.didChangeConfig(rec.ctx(), &protocol.DidChangeConfigurationParams{
-		Settings: map[string]any{"kubernetes": map[string]any{"schemaUrl": "https://mirror/{kindLower}.json"}},
+		Settings: map[string]any{"kubernetes": map[string]any{"schemaUrl": "https://mirror/{kind}.json"}},
 	}); err != nil {
 		t.Fatalf("didChangeConfig: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestSettings_OverridesSurviveWorkspaceFolderChange(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("didChangeWorkspaceFolders: %v", err)
 	}
-	if s.settings.Kubernetes == nil || s.settings.Kubernetes.SchemaURL != "https://mirror/{kindLower}.json" {
+	if s.settings.Kubernetes == nil || s.settings.Kubernetes.SchemaURL != "https://mirror/{kind}.json" {
 		t.Errorf("override dropped after workspace-folder change: %+v", s.settings.Kubernetes)
 	}
 }

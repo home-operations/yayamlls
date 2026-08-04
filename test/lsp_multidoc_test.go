@@ -19,7 +19,7 @@ func TestMultiDocMixedKinds(t *testing.T) {
 	root := t.TempDir()
 	// Pin yannh so the test doesn't depend on what the default mirror hosts.
 	cfg := `kubernetes:
-  schemaUrl: "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master-standalone-strict/{kindLower}-{groupFirstSeg}{version}.json"
+  schemaUrl: "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master-standalone-strict/{kind@L}-{groupFirst}{groupFirst:+-}{version}.json"
 catalog: false
 `
 	if err := os.WriteFile(filepath.Join(root, ".yayamlls.yaml"), []byte(cfg), 0o644); err != nil {

@@ -6,23 +6,35 @@ import (
 )
 
 const DefaultK8sSchemaURL = "https://k8s-schemas.home-operations.com/" +
-	"{group:-core}/{kindLower}_{versionLower}.json"
+	"{group:-core}/{kind@L}_{version@L}.json"
 
 var exprRe = regexp.MustCompile(`\{([^}]+)\}`)
+
+func varsReplacer(m map[string]string) *strings.Replacer {
+	args := make([]string, 0, len(m)*2)
+	for k, v := range m {
+		args = append(args, "{"+k+"}", v)
+	}
+	return strings.NewReplacer(args...)
+}
 
 // BuildK8sURL renders a URL template against a GVK. Supported placeholders:
 //
 //	{group}         full api group, "" for core
-//	{groupSeg}      "<group>/" or ""
 //	{groupFirst}    first DNS label of the group
-//	{groupFirstSeg} "<groupFirst>-" or ""
-//	{kind}          {kindLower}
-//	{version}       {versionLower}
+//	{kind}          the resource kind
+//	{version}       the api version
+//	{kindLower}     legacy alias for {kind@L}
+//	{versionLower}  legacy alias for {version@L}
+//	{groupSeg}      legacy alias for {group}{group:+/}
+//	{groupFirstSeg} legacy alias for {groupFirst}{groupFirst:+-}
 //
 // Expression syntax (shell-like parameter expansion):
 //
 //	{var:-word}     "word" if var is empty, else var
 //	{var:+word}     "word" if var is non-empty, else ""
+//	{var@U}         var but uppercased
+//	{var@L}         var but lowercased
 func BuildK8sURL(template, group, version, kind string) string {
 	if version == "" || kind == "" {
 		return ""
@@ -45,9 +57,9 @@ func BuildK8sURL(template, group, version, kind string) string {
 		"groupSeg":      groupSeg,
 		"groupFirst":    groupFirst,
 		"groupFirstSeg": groupFirstSeg,
-		"kind":          strings.ToLower(kind),
+		"kind":          kind,
 		"kindLower":     strings.ToLower(kind),
-		"version":       strings.ToLower(version),
+		"version":       version,
 		"versionLower":  strings.ToLower(version),
 	}
 
@@ -68,21 +80,26 @@ func BuildK8sURL(template, group, version, kind string) string {
 			return ""
 		}
 
+		if name, operator, ok := strings.Cut(inner, "@"); ok {
+			if val, exists := vars[name]; exists {
+				switch operator {
+				case "U":
+					return strings.ToUpper(val)
+				case "L":
+					return strings.ToLower(val)
+				}
+			}
+
+			// ignore undefined operators
+			inner = name
+		}
+
 		if val, ok := vars[inner]; ok {
 			return val
 		}
 		return match
 	})
 
-	r := strings.NewReplacer(
-		"{group}", group,
-		"{groupSeg}", groupSeg,
-		"{groupFirst}", groupFirst,
-		"{groupFirstSeg}", groupFirstSeg,
-		"{kind}", strings.ToLower(kind),
-		"{kindLower}", strings.ToLower(kind),
-		"{version}", strings.ToLower(version),
-		"{versionLower}", strings.ToLower(version),
-	)
+	r := varsReplacer(vars)
 	return r.Replace(template)
 }

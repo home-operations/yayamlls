@@ -87,9 +87,9 @@ func TestMerge_UnionsGlobsForSameSchema(t *testing.T) {
 
 func TestMerge_CarriesKubernetes(t *testing.T) {
 	base := Settings{}
-	override := Settings{Kubernetes: &KubernetesSettings{SchemaURL: "https://mirror.example/{kindLower}.json"}}
+	override := Settings{Kubernetes: &KubernetesSettings{SchemaURL: "https://mirror.example/{kind}.json"}}
 	got := Merge(base, override)
-	if got.Kubernetes == nil || got.Kubernetes.SchemaURL != "https://mirror.example/{kindLower}.json" {
+	if got.Kubernetes == nil || got.Kubernetes.SchemaURL != "https://mirror.example/{kind}.json" {
 		t.Errorf("override kubernetes.schemaUrl dropped: %+v", got.Kubernetes)
 	}
 }
@@ -97,12 +97,12 @@ func TestMerge_CarriesKubernetes(t *testing.T) {
 func TestMerge_KubernetesFieldMerge(t *testing.T) {
 	// A workspace opt-out must survive an override that only sets schemaUrl.
 	base := Settings{Kubernetes: &KubernetesSettings{Enabled: new(false)}}
-	override := Settings{Kubernetes: &KubernetesSettings{SchemaURL: "https://mirror/{kindLower}.json"}}
+	override := Settings{Kubernetes: &KubernetesSettings{SchemaURL: "https://mirror/{kind}.json"}}
 	got := Merge(base, override)
 	if got.Kubernetes.Enabled == nil || *got.Kubernetes.Enabled {
 		t.Errorf("enabled:false dropped by partial override: %+v", got.Kubernetes)
 	}
-	if got.Kubernetes.SchemaURL != "https://mirror/{kindLower}.json" {
+	if got.Kubernetes.SchemaURL != "https://mirror/{kind}.json" {
 		t.Errorf("schemaUrl not merged: %+v", got.Kubernetes)
 	}
 	// Merge must not mutate base's pointee.

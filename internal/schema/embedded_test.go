@@ -13,7 +13,7 @@ func TestEmbeddedYamllsSchema_LoadsAndCompiles(t *testing.T) {
 	good := map[string]any{
 		"catalog": true,
 		"kubernetes": map[string]any{
-			"schemaUrl": "https://example.com/{kindLower}.json",
+			"schemaUrl": "https://example.com/{kind}.json",
 		},
 	}
 	if err := sch.Validate(good); err != nil {
