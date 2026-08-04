@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/home-operations/yayamlls/compare/0.1.15...0.2.0) (2026-08-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* add case operators for k8s url formatting ([#142](https://github.com/home-operations/yayamlls/issues/142))
+
+### Features
+
+* add case operators for k8s url formatting ([#142](https://github.com/home-operations/yayamlls/issues/142)) ([72c3707](https://github.com/home-operations/yayamlls/commit/72c3707777efcfff891c3d06552dd0dbe024a781))
+
 ## [0.1.15](https://github.com/home-operations/yayamlls/compare/0.1.14...0.1.15) (2026-08-03)
 
 
