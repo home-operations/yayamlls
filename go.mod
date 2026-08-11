@@ -9,7 +9,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
-	golang.org/x/text v0.40.0
+	golang.org/x/text v0.41.0
 )
 
 require (
