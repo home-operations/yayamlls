@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.3.0](https://github.com/home-operations/yayamlls/compare/0.2.0...0.3.0) (2026-08-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **go:** Update module github.com/home-operations/flate (v0.4.14 → v0.5.0) ([#151](https://github.com/home-operations/yayamlls/issues/151))
+* **npm:** Update dependency typescript (6.0.3 → 7.0.2) ([#101](https://github.com/home-operations/yayamlls/issues/101))
+
+### Features
+
+* **go:** Update module github.com/home-operations/flate (v0.4.14 → v0.5.0) ([#151](https://github.com/home-operations/yayamlls/issues/151)) ([c31bf1f](https://github.com/home-operations/yayamlls/commit/c31bf1f06ee00ae5a0b63114528e16ee3cbe67bb))
+* **go:** update module golang.org/x/text (v0.40.0 → v0.41.0) ([#152](https://github.com/home-operations/yayamlls/issues/152)) ([d370380](https://github.com/home-operations/yayamlls/commit/d37038035c17fb4ec66b7ac50d103515f631e9d2))
+* **npm:** Update dependency typescript (6.0.3 → 7.0.2) ([#101](https://github.com/home-operations/yayamlls/issues/101)) ([82a371a](https://github.com/home-operations/yayamlls/commit/82a371a2525a8686a9a20974cdb306288b5a8b64))
+* **npm:** update dependency vscode (1.129.1 → 1.132.0) ([#115](https://github.com/home-operations/yayamlls/issues/115)) ([25e382f](https://github.com/home-operations/yayamlls/commit/25e382fd99942ff04948b084c66f416f2a13e489))
+* **npm:** update dependency vscode (1.132.0 → 1.133.0) ([#153](https://github.com/home-operations/yayamlls/issues/153)) ([56900d7](https://github.com/home-operations/yayamlls/commit/56900d786702af0f9a236af65f2946ad8c909a30))
+* **npm:** update dependency vscode (1.133.0 → 1.134.0) ([#161](https://github.com/home-operations/yayamlls/issues/161)) ([ce32aa2](https://github.com/home-operations/yayamlls/commit/ce32aa2887a323324a7cf73b8453127a641f9043))
+
+
+### Bug Fixes
+
+* **go:** update module github.com/home-operations/flate (v0.4.12 → v0.4.14) ([#148](https://github.com/home-operations/yayamlls/issues/148)) ([81e8d24](https://github.com/home-operations/yayamlls/commit/81e8d2499dfc7b14da3545a8eeee93186555b62c))
+* **go:** update module github.com/home-operations/flate (v0.5.0 → v0.5.1) ([#162](https://github.com/home-operations/yayamlls/issues/162)) ([5837649](https://github.com/home-operations/yayamlls/commit/58376496a7c3c133b153b6c6b8af5ff8342afd9a))
+* **go:** update module github.com/santhosh-tekuri/jsonschema/v6 (v6.0.2 → v6.0.3) ([#146](https://github.com/home-operations/yayamlls/issues/146)) ([8b41bd8](https://github.com/home-operations/yayamlls/commit/8b41bd826b93f74ad8e3bd70421aaf32183b1d55))
+
+
+### Documentation
+
+* describe the pinned go directive policy ([#158](https://github.com/home-operations/yayamlls/issues/158)) ([798e581](https://github.com/home-operations/yayamlls/commit/798e5815a8155d02c0d7c5ab8b18e5c5c7b71d34))
+
+
+### Continuous Integration
+
+* **github-action:** Update action docker/github-builder (v1.15.0 → v1.16.0) ([#149](https://github.com/home-operations/yayamlls/issues/149)) ([ade16d6](https://github.com/home-operations/yayamlls/commit/ade16d6aeffb4976fd1285f65edbb3acd0a4af80))
+* **github-action:** Update action jdx/mise-action (v4.2.3 → v4.2.4) ([#144](https://github.com/home-operations/yayamlls/issues/144)) ([1acd8eb](https://github.com/home-operations/yayamlls/commit/1acd8eb1bcb3787850604bda71987f9ba42bde10))
+
+
+### Miscellaneous Chores
+
+* **github-action:** update action jdx/mise-action (v4.2.4 → v4.2.5) ([#157](https://github.com/home-operations/yayamlls/issues/157)) ([8db6cd5](https://github.com/home-operations/yayamlls/commit/8db6cd54a192bcf49c1a8353e369f91d684bf659))
+* **mise:** update tool go (1.26.5 → 1.26.6) ([#160](https://github.com/home-operations/yayamlls/issues/160)) ([a2297e9](https://github.com/home-operations/yayamlls/commit/a2297e9cee743f301b6df075f769e28ba7b42732))
+* **mise:** update tool go:golang.org/x/vuln/cmd/govulncheck (1.6.0 → v1.7.0) ([#156](https://github.com/home-operations/yayamlls/issues/156)) ([c15e73a](https://github.com/home-operations/yayamlls/commit/c15e73a4ea9d8e71894e83bd08a5528565c98250))
+* **mise:** Update tool oxfmt (0.61.0 → 0.62.0) ([#147](https://github.com/home-operations/yayamlls/issues/147)) ([d51bf56](https://github.com/home-operations/yayamlls/commit/d51bf562af34063b0d828d41be201b2e3b82a23e))
+* **mise:** update tool oxfmt (0.62.0 → 0.63.0) ([#154](https://github.com/home-operations/yayamlls/issues/154)) ([226b19c](https://github.com/home-operations/yayamlls/commit/226b19c08efbc9910fc835ce78d2581484470e4f))
+* **mise:** update tool oxfmt (0.63.0 → 0.64.0) ([#163](https://github.com/home-operations/yayamlls/issues/163)) ([0096f26](https://github.com/home-operations/yayamlls/commit/0096f2698bae78caf493ccd80c59038ef59d9654))
+
 ## [0.2.0](https://github.com/home-operations/yayamlls/compare/0.1.15...0.2.0) (2026-08-04)
 
 
