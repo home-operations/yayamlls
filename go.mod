@@ -1,11 +1,11 @@
 module github.com/home-operations/yayamlls
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/home-operations/flate v0.5.1
+	github.com/home-operations/flate v0.6.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
