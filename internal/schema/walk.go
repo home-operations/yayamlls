@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -19,18 +20,13 @@ func Resolve(root *jsonschema.Schema, ptr string) *jsonschema.Schema {
 		return cur
 	}
 	for seg := range strings.SplitSeq(strings.TrimPrefix(ptr, "/"), "/") {
-		next := step(cur, unescape(seg))
+		next := step(cur, yamlast.UnescapePointerSegment(seg))
 		if next == nil {
 			return nil
 		}
 		cur = follow(next)
 	}
 	return cur
-}
-
-func unescape(s string) string {
-	s = strings.ReplaceAll(s, "~1", "/")
-	return strings.ReplaceAll(s, "~0", "~")
 }
 
 // follow unwraps a $ref chain, but stops at a node that carries its own
