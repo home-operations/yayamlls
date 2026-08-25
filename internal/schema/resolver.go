@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -175,5 +176,15 @@ func (r *Resolver) K8sURL(gvk GVK) string {
 	if !enabled {
 		return ""
 	}
-	return BuildK8sURL(tmpl, gvk.Group, gvk.Version, gvk.Kind)
+	url, err := BuildK8sURL(tmpl, gvk.Group, gvk.Version, gvk.Kind)
+	if err != nil {
+		slog.Warn(
+			"invalid kubernetes.schemaUrl template",
+			"template",
+			tmpl,
+			"error",
+			err)
+		return ""
+	}
+	return url
 }
