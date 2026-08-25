@@ -356,6 +356,89 @@ func TestBuildK8sURL_NestedExpressions(t *testing.T) {
 	}
 }
 
+func TestBuildK8sURL_Escaping(t *testing.T) {
+	tests := []struct {
+		name  string
+		tmpl  string
+		group string
+		want  string
+	}{
+		{
+			name:  "both braces escaped at top level",
+			tmpl:  `\{group\}`,
+			group: "apps",
+			want:  "{group}",
+		},
+		{
+			name:  "escaped open brace",
+			tmpl:  `a\{b`,
+			group: "apps",
+			want:  "a{b",
+		},
+		{
+			name:  "escaped close brace",
+			tmpl:  `a\}b`,
+			group: "apps",
+			want:  "a}b",
+		},
+		{
+			name:  "escaped braces in url",
+			tmpl:  `https://example.com/\{kind\}`,
+			group: "apps",
+			want:  "https://example.com/{kind}",
+		},
+		{
+			name:  "escaped braces next to expression",
+			tmpl:  `\{group\}/{kind@L}`,
+			group: "apps",
+			want:  "{group}/deployment",
+		},
+		{
+			name:  "escaped close brace in fallback word",
+			tmpl:  `{group:-a\}b}`,
+			group: "",
+			want:  "a}b",
+		},
+		{
+			name:  "escaped open brace in fallback word",
+			tmpl:  `{group:-a\{b}`,
+			group: "",
+			want:  "a{b",
+		},
+		{
+			name:  "escaped backslash in fallback word",
+			tmpl:  `{group:-a\@b}`,
+			group: "",
+			want:  "a@b",
+		},
+		{
+			name:  "backslash before non-brace drops backslash",
+			tmpl:  `a\b`,
+			group: "apps",
+			want:  "ab",
+		},
+		{
+			name:  "double backslash yields single",
+			tmpl:  `a\\b`,
+			group: "apps",
+			want:  `a\b`,
+		},
+		{
+			name:  "trailing backslash dropped",
+			tmpl:  `a\`,
+			group: "apps",
+			want:  "a",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := buildK8sURL(t, tc.tmpl, tc.group, "v1", "Deployment"); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestBuildK8sURL_UnbalancedBraces(t *testing.T) {
 	tests := []struct {
 		name string

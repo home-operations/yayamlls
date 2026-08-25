@@ -28,6 +28,9 @@ const DefaultK8sSchemaURL = "https://k8s-schemas.home-operations.com/" +
 //
 // Nested expressions: an operand or word may itself be an {expression}, evaluated
 // before the surrounding one, e.g. {{group:-core}@U} yields "CORE" for core.
+//
+// A backslash escapes the next character, dropping the backslash: \{ and \}
+// yield literal braces that don't open or close an expression, \x yields x.
 func BuildK8sURL(template, group, version, kind string) (string, error) {
 	if version == "" || kind == "" {
 		return "", nil
@@ -112,6 +115,13 @@ func parseTemplate(template string) ([]node, error) {
 	var b strings.Builder
 	for i := 0; i < len(template); {
 		switch template[i] {
+		case '\\':
+			if i+1 < len(template) {
+				b.WriteByte(template[i+1])
+				i += 2
+			} else {
+				i++
+			}
 		case '{':
 			if b.Len() > 0 {
 				nodes = append(nodes, textNode{s: b.String()})
@@ -183,6 +193,10 @@ func parseOperator(word string) operator {
 func matchBraces(s string, start int) (int, bool) {
 	depth := 0
 	for i := start; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++
+			continue
+		}
 		switch s[i] {
 		case '{':
 			depth++
@@ -256,7 +270,7 @@ func evalTerm(t term, vars map[string]string) (string, error) {
 		}
 		return val, nil
 	case termWord:
-		return t.raw, nil
+		return unescapeWord(t.raw), nil
 	default:
 		return "", fmt.Errorf("unknown term kind %d", t.kind)
 	}
@@ -285,6 +299,10 @@ func (e expression) separator() string {
 
 func findExpression(s string) (expression, int) {
 	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++
+			continue
+		}
 		if s[i] == '{' {
 			end, ok := matchBraces(s, i)
 			if !ok {
@@ -306,4 +324,22 @@ func findExpression(s string) (expression, int) {
 		}
 	}
 	return expressionNone, -1
+}
+
+func unescapeWord(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++
+			if i < len(s) {
+				b.WriteByte(s[i])
+			}
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
