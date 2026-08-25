@@ -52,6 +52,27 @@ func TestResolver_K8sURLGatedByEnabled(t *testing.T) {
 	}
 }
 
+func TestResolver_InvalidK8sTemplateDisablesURLs(t *testing.T) {
+	gvk := GVK{Group: "apps", Version: "v1", Kind: "Deployment"}
+	r := NewResolver()
+
+	r.SetSettings(config.Settings{
+		Kubernetes: &config.KubernetesSettings{SchemaURL: "{nope}"},
+	})
+	if got := r.K8sURL(gvk); got != "" {
+		t.Errorf("expected empty for invalid template, got %q", got)
+	}
+
+	r.SetSettings(config.Settings{
+		Kubernetes: &config.KubernetesSettings{
+			SchemaURL: "{group:-core}/{kind@L}_{version@L}.json",
+		},
+	})
+	if got := r.K8sURL(gvk); got == "" {
+		t.Errorf("expected URLs after replacing the broken template, got empty")
+	}
+}
+
 func TestMatchSettings_DeterministicMostSpecific(t *testing.T) {
 	schemas := map[string][]string{
 		"./a.json": {"**/*.yaml"},

@@ -7,14 +7,14 @@ import (
 
 func buildK8sURL(t *testing.T, template, group, version, kind string) string {
 	t.Helper()
-	got, err := BuildK8sURL(template, group, version, kind)
+	parsed, err := parseK8sTemplate(template)
 	if err != nil {
-		t.Fatalf("BuildK8sURL(%q) returned error: %v", template, err)
+		t.Fatalf("ParseK8sTemplate(%q) returned error: %v", template, err)
 	}
-	return got
+	return parsed.Render(group, version, kind)
 }
 
-func TestBuildK8sURL_DefaultPointsAtHomeOperations(t *testing.T) {
+func TestRenderK8sURL_DefaultPointsAtHomeOperations(t *testing.T) {
 	got := buildK8sURL(t, "", "apps", "v1", "Deployment")
 	want := "https://k8s-schemas.home-operations.com/apps/deployment_v1.json"
 	if got != want {
@@ -22,7 +22,7 @@ func TestBuildK8sURL_DefaultPointsAtHomeOperations(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_DefaultCoreResource(t *testing.T) {
+func TestRenderK8sURL_DefaultCoreResource(t *testing.T) {
 	got := buildK8sURL(t, "", "", "v1", "Pod")
 	want := "https://k8s-schemas.home-operations.com/core/pod_v1.json"
 	if got != want {
@@ -30,7 +30,7 @@ func TestBuildK8sURL_DefaultCoreResource(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_TemplatePlaceholders(t *testing.T) {
+func TestRenderK8sURL_TemplatePlaceholders(t *testing.T) {
 	tmpl := "https://schemas.example.com/{group}{group:+/}{kind@L}_{version@L}.json"
 	got := buildK8sURL(t, tmpl, "helm.toolkit.fluxcd.io", "v2", "HelmRelease")
 	want := "https://schemas.example.com/helm.toolkit.fluxcd.io/helmrelease_v2.json"
@@ -39,7 +39,7 @@ func TestBuildK8sURL_TemplatePlaceholders(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_YannhLayoutViaTemplate(t *testing.T) {
+func TestRenderK8sURL_YannhLayoutViaTemplate(t *testing.T) {
 	tmpl := "https://yannh.example/{kind@L}-{groupFirst}{groupFirst:+-}{version@L}.json"
 	if got := buildK8sURL(t, tmpl, "", "v1", "Pod"); got != "https://yannh.example/pod-v1.json" {
 		t.Errorf("core: got %q", got)
@@ -49,7 +49,7 @@ func TestBuildK8sURL_YannhLayoutViaTemplate(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_EmptyWhenMissingFields(t *testing.T) {
+func TestRenderK8sURL_EmptyWhenMissingFields(t *testing.T) {
 	if got := buildK8sURL(t, "", "apps", "", "Deployment"); got != "" {
 		t.Errorf("missing version should yield empty, got %q", got)
 	}
@@ -58,7 +58,7 @@ func TestBuildK8sURL_EmptyWhenMissingFields(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_AllPlaceholdersResolve(t *testing.T) {
+func TestRenderK8sURL_AllPlaceholdersResolve(t *testing.T) {
 	tmpl := "{group}|{groupSeg}|{groupFirst}|{groupFirstSeg}|{kind}|{kindLower}|{version}|{versionLower}"
 	got := buildK8sURL(t, tmpl, "apps.k8s.io", "v1beta1", "Deployment")
 	if strings.Contains(got, "{") || strings.Contains(got, "}") {
@@ -66,7 +66,7 @@ func TestBuildK8sURL_AllPlaceholdersResolve(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_ExprDefaultOnEmpty(t *testing.T) {
+func TestRenderK8sURL_ExprDefaultOnEmpty(t *testing.T) {
 	tests := []struct {
 		name  string
 		group string
@@ -87,7 +87,7 @@ func TestBuildK8sURL_ExprDefaultOnEmpty(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_ExprAltOnNonEmpty(t *testing.T) {
+func TestRenderK8sURL_ExprAltOnNonEmpty(t *testing.T) {
 	tests := []struct {
 		name  string
 		group string
@@ -106,7 +106,7 @@ func TestBuildK8sURL_ExprAltOnNonEmpty(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_ExprSimpleSubstitution(t *testing.T) {
+func TestRenderK8sURL_ExprSimpleSubstitution(t *testing.T) {
 	if got := buildK8sURL(t, "{group}", "", "v1", "Namespace"); got != "" {
 		t.Errorf("core: got %q", got)
 	}
@@ -118,7 +118,7 @@ func TestBuildK8sURL_ExprSimpleSubstitution(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_ExprComposeGroupSeg(t *testing.T) {
+func TestRenderK8sURL_ExprComposeGroupSeg(t *testing.T) {
 	tmpl := "{group:-core}/{kind}_{version}.json"
 
 	if got := buildK8sURL(t, tmpl, "", "v1", "Namespace"); got != "core/Namespace_v1.json" {
@@ -132,7 +132,7 @@ func TestBuildK8sURL_ExprComposeGroupSeg(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_UnknownPlaceholderErrors(t *testing.T) {
+func TestParseK8sTemplate_UnknownPlaceholder(t *testing.T) {
 	tmpls := []string{
 		"{unknown}",
 		"{unknown}/{group}",
@@ -140,14 +140,14 @@ func TestBuildK8sURL_UnknownPlaceholderErrors(t *testing.T) {
 	}
 	for _, tmpl := range tmpls {
 		t.Run(tmpl, func(t *testing.T) {
-			if got, err := BuildK8sURL(tmpl, "apps", "v1", "Deployment"); err == nil {
-				t.Errorf("expected error for %q, got %q", tmpl, got)
+			if _, err := parseK8sTemplate(tmpl); err == nil {
+				t.Errorf("expected error for %q", tmpl)
 			}
 		})
 	}
 }
 
-func TestBuildK8sURL_ExprUppercaseOperator(t *testing.T) {
+func TestRenderK8sURL_ExprUppercaseOperator(t *testing.T) {
 	tests := []struct {
 		name    string
 		tmpl    string
@@ -197,7 +197,7 @@ func TestBuildK8sURL_ExprUppercaseOperator(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_ExprLowercaseOperator(t *testing.T) {
+func TestRenderK8sURL_ExprLowercaseOperator(t *testing.T) {
 	tests := []struct {
 		name    string
 		tmpl    string
@@ -247,21 +247,21 @@ func TestBuildK8sURL_ExprLowercaseOperator(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_ExprUndefinedOperator(t *testing.T) {
+func TestParseK8sTemplate_UndefinedOperator(t *testing.T) {
 	tmpls := []string{
 		"{group@xyz}",
 		"{kind@}",
 	}
 	for _, tmpl := range tmpls {
 		t.Run(tmpl, func(t *testing.T) {
-			if got, err := BuildK8sURL(tmpl, "apps", "v1", "Deployment"); err == nil {
-				t.Errorf("expected error for %q, got %q", tmpl, got)
+			if _, err := parseK8sTemplate(tmpl); err == nil {
+				t.Errorf("expected error for %q", tmpl)
 			}
 		})
 	}
 }
 
-func TestBuildK8sURL_NestedExpressions(t *testing.T) {
+func TestRenderK8sURL_NestedExpressions(t *testing.T) {
 	tests := []struct {
 		name  string
 		tmpl  string
@@ -356,7 +356,7 @@ func TestBuildK8sURL_NestedExpressions(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_Escaping(t *testing.T) {
+func TestRenderK8sURL_Escaping(t *testing.T) {
 	tests := []struct {
 		name  string
 		tmpl  string
@@ -439,7 +439,42 @@ func TestBuildK8sURL_Escaping(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_UnbalancedBraces(t *testing.T) {
+func TestParseK8sTemplate_NestedInSkippedBranch(t *testing.T) {
+	tmpls := []string{
+		"{group:-{kind@xyz}}",
+		"{group:+{version@q}}",
+		"{group:+{nope}}",
+		"{{group@q}:-core}",
+		"{kind@{group:-x}}",
+	}
+	for _, tmpl := range tmpls {
+		t.Run(tmpl, func(t *testing.T) {
+			if _, err := parseK8sTemplate(tmpl); err == nil {
+				t.Errorf("expected error for %q", tmpl)
+			}
+		})
+	}
+}
+
+func TestParseK8sTemplate_ValidTemplates(t *testing.T) {
+	tmpls := []string{
+		"{group:-core}/{kind@L}_{version@L}.json",
+		"{group}{group:+/}{kind@L}_{version@L}.json",
+		"https://example.com/{kindLower}.json",
+		"{group:-{kind@U}}",
+		"{{group:-core}@U}",
+		`a\{group\}b`,
+	}
+	for _, tmpl := range tmpls {
+		t.Run(tmpl, func(t *testing.T) {
+			if _, err := parseK8sTemplate(tmpl); err != nil {
+				t.Errorf("unexpected error for %q: %v", tmpl, err)
+			}
+		})
+	}
+}
+
+func TestParseK8sTemplate_UnbalancedBraces(t *testing.T) {
 	tests := []struct {
 		name string
 		tmpl string
@@ -471,14 +506,14 @@ func TestBuildK8sURL_UnbalancedBraces(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got, err := BuildK8sURL(tc.tmpl, "", "v1", "Resource"); err == nil {
-				t.Errorf("expected error for %q, got %q", tc.tmpl, got)
+			if _, err := parseK8sTemplate(tc.tmpl); err == nil {
+				t.Errorf("expected error for %q", tc.tmpl)
 			}
 		})
 	}
 }
 
-func TestBuildK8sURL_LegacyLowercaseVars(t *testing.T) {
+func TestRenderK8sURL_LegacyLowercaseVars(t *testing.T) {
 	tests := []struct {
 		name    string
 		tmpl    string
@@ -543,7 +578,7 @@ func TestBuildK8sURL_LegacyLowercaseVars(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_LegacyVarsMatchOperators(t *testing.T) {
+func TestRenderK8sURL_LegacyVarsMatchOperators(t *testing.T) {
 	legacy := buildK8sURL(t, "{kindLower}_{versionLower}", "apps", "V1Beta1", "Deployment")
 	operators := buildK8sURL(t, "{kind@L}_{version@L}", "apps", "V1Beta1", "Deployment")
 	if legacy != operators {
@@ -551,7 +586,7 @@ func TestBuildK8sURL_LegacyVarsMatchOperators(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_LegacySegVars(t *testing.T) {
+func TestRenderK8sURL_LegacySegVars(t *testing.T) {
 	tests := []struct {
 		name  string
 		tmpl  string
@@ -602,7 +637,7 @@ func TestBuildK8sURL_LegacySegVars(t *testing.T) {
 	}
 }
 
-func TestBuildK8sURL_LegacySegVarsMatchComposition(t *testing.T) {
+func TestRenderK8sURL_LegacySegVarsMatchComposition(t *testing.T) {
 	for _, group := range []string{"", "apps", "rbac.authorization.k8s.io"} {
 		if got, want := buildK8sURL(t, "{groupSeg}", group, "v1", "Resource"), buildK8sURL(t, "{group}{group:+/}", group, "v1", "Resource"); got != want {
 			t.Errorf("group %q: {groupSeg} %q != {group}{group:+/} %q", group, got, want)

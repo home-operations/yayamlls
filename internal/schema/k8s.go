@@ -8,7 +8,14 @@ import (
 const DefaultK8sSchemaURL = "https://k8s-schemas.home-operations.com/" +
 	"{group:-core}/{kind@L}_{version@L}.json"
 
-// BuildK8sURL renders a URL template against a GVK. Supported placeholders:
+// k8sTemplate is a parsed schema URL template. Parsing resolves every
+// placeholder against the known vars and pins each operator, so Render cannot
+// fail.
+type k8sTemplate struct {
+	nodes []node
+}
+
+// parseK8sTemplate parses spec into a render-ready template. Supported placeholders:
 //
 //	{group}         full api group, "" for core
 //	{groupFirst}    first DNS label of the group
@@ -31,39 +38,32 @@ const DefaultK8sSchemaURL = "https://k8s-schemas.home-operations.com/" +
 //
 // A backslash escapes the next character, dropping the backslash: \{ and \}
 // yield literal braces that don't open or close an expression, \x yields x.
-func BuildK8sURL(template, group, version, kind string) (string, error) {
-	if version == "" || kind == "" {
-		return "", nil
+func parseK8sTemplate(spec string) (*k8sTemplate, error) {
+	if spec == "" {
+		spec = DefaultK8sSchemaURL
 	}
-	if template == "" {
-		template = DefaultK8sSchemaURL
-	}
-	groupFirst, _, _ := strings.Cut(group, ".")
-	groupSeg := ""
-	if group != "" {
-		groupSeg = group + "/"
-	}
-	groupFirstSeg := ""
-	if groupFirst != "" {
-		groupFirstSeg = groupFirst + "-"
-	}
-
-	vars := map[string]string{
-		"group":         group,
-		"groupSeg":      groupSeg,
-		"groupFirst":    groupFirst,
-		"groupFirstSeg": groupFirstSeg,
-		"kind":          kind,
-		"kindLower":     strings.ToLower(kind),
-		"version":       version,
-		"versionLower":  strings.ToLower(version),
-	}
-
-	nodes, err := parseTemplate(template)
+	nodes, err := parseTemplate(spec)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return evalNodes(nodes, vars)
+	for _, n := range nodes {
+		if e, ok := n.(exprNode); ok {
+			if err := resolveBody(e.body); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return &k8sTemplate{nodes: nodes}, nil
+}
+
+// Render evaluates and expands the template into a schema URL.
+func (t *k8sTemplate) Render(group, version, kind string) string {
+	if version == "" || kind == "" {
+		return ""
+	}
+	var b strings.Builder
+	renderNodes(&b, t.nodes, k8sVars(group, version, kind))
+	return b.String()
 }
 
 // node is a parsed template fragment: either literal text or a {expression}.
@@ -84,6 +84,7 @@ type exprBody struct {
 	expr    expression
 	operand term
 	word    term
+	op      operator
 }
 
 // termKind discriminates a term: operand references a var by name, word is literal.
@@ -109,6 +110,75 @@ const (
 	operatorUpper
 	operatorLower
 )
+
+func k8sVars(group, version, kind string) map[string]string {
+	groupFirst, _, _ := strings.Cut(group, ".")
+	groupSeg := ""
+	if group != "" {
+		groupSeg = group + "/"
+	}
+	groupFirstSeg := ""
+	if groupFirst != "" {
+		groupFirstSeg = groupFirst + "-"
+	}
+	return map[string]string{
+		"group":         group,
+		"groupSeg":      groupSeg,
+		"groupFirst":    groupFirst,
+		"groupFirstSeg": groupFirstSeg,
+		"kind":          kind,
+		"kindLower":     strings.ToLower(kind),
+		"version":       version,
+		"versionLower":  strings.ToLower(version),
+	}
+}
+
+var knownK8sVars = func() map[string]struct{} {
+	names := make(map[string]struct{})
+	for name := range k8sVars("", "", "") {
+		names[name] = struct{}{}
+	}
+	return names
+}()
+
+func resolveBody(eb *exprBody) error {
+	if err := resolveTerm(&eb.operand); err != nil {
+		return err
+	}
+	switch eb.expr {
+	case expressionNone:
+		return nil
+	case expressionDefault, expressionAlt:
+		return resolveTerm(&eb.word)
+	case expressionOperator:
+		op := parseOperator(eb.word.raw)
+		if op == operatorNone {
+			return fmt.Errorf("undefined operator %q on {%s}", eb.word.raw, eb.operand.raw)
+		}
+		eb.op = op
+		return nil
+	default:
+		return fmt.Errorf("expression %d not implemented", eb.expr)
+	}
+}
+
+func resolveTerm(t *term) error {
+	if t.nested != nil {
+		return resolveBody(t.nested)
+	}
+	switch t.kind {
+	case termOperand:
+		if _, ok := knownK8sVars[t.raw]; !ok {
+			return fmt.Errorf("unknown placeholder %q", t.raw)
+		}
+		return nil
+	case termWord:
+		t.raw = unescapeWord(t.raw)
+		return nil
+	default:
+		return fmt.Errorf("unknown term kind %d", t.kind)
+	}
+}
 
 func parseTemplate(template string) ([]node, error) {
 	var nodes []node
@@ -210,70 +280,51 @@ func matchBraces(s string, start int) (int, bool) {
 	return 0, false
 }
 
-func evalNodes(nodes []node, vars map[string]string) (string, error) {
-	var b strings.Builder
+func renderNodes(b *strings.Builder, nodes []node, vars map[string]string) {
 	for _, n := range nodes {
 		switch n := n.(type) {
 		case textNode:
 			b.WriteString(n.s)
 		case exprNode:
-			val, err := evalBody(n.body, vars)
-			if err != nil {
-				return "", err
-			}
-			b.WriteString(val)
+			b.WriteString(renderBody(n.body, vars))
 		}
 	}
-	return b.String(), nil
 }
 
-func evalBody(eb *exprBody, vars map[string]string) (string, error) {
+func renderBody(eb *exprBody, vars map[string]string) string {
 	switch eb.expr {
 	case expressionNone:
-		return evalTerm(eb.operand, vars)
+		return renderTerm(eb.operand, vars)
 	case expressionDefault:
-		if val, err := evalTerm(eb.operand, vars); err == nil && val != "" {
-			return val, nil
+		if val := renderTerm(eb.operand, vars); val != "" {
+			return val
 		}
-		return evalTerm(eb.word, vars)
+		return renderTerm(eb.word, vars)
 	case expressionAlt:
-		if val, err := evalTerm(eb.operand, vars); err == nil && val != "" {
-			return evalTerm(eb.word, vars)
+		if renderTerm(eb.operand, vars) != "" {
+			return renderTerm(eb.word, vars)
 		}
-		return "", nil
+		return ""
 	case expressionOperator:
-		val, err := evalTerm(eb.operand, vars)
-		if err != nil {
-			return "", err
+		val := renderTerm(eb.operand, vars)
+		if eb.op == operatorUpper {
+			return strings.ToUpper(val)
 		}
-		switch parseOperator(eb.word.raw) {
-		case operatorUpper:
-			return strings.ToUpper(val), nil
-		case operatorLower:
-			return strings.ToLower(val), nil
-		}
-		return "", fmt.Errorf("undefined operator %q on {%s}", eb.word.raw, eb.operand.raw)
-	default:
-		return "", fmt.Errorf("expression %d not implemented", eb.expr)
+		return strings.ToLower(val)
 	}
+	return ""
 }
 
-func evalTerm(t term, vars map[string]string) (string, error) {
+// renderTerm assumes a resolved term: operand raws are keys of vars (guaranteed
+// by resolveTerm), so a plain index can't miss.
+func renderTerm(t term, vars map[string]string) string {
 	if t.nested != nil {
-		return evalBody(t.nested, vars)
+		return renderBody(t.nested, vars)
 	}
-	switch t.kind {
-	case termOperand:
-		val, ok := vars[t.raw]
-		if !ok {
-			return "", fmt.Errorf("unknown placeholder %q", t.raw)
-		}
-		return val, nil
-	case termWord:
-		return unescapeWord(t.raw), nil
-	default:
-		return "", fmt.Errorf("unknown term kind %d", t.kind)
+	if t.kind == termOperand {
+		return vars[t.raw]
 	}
+	return t.raw
 }
 
 type expression int

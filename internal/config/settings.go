@@ -27,7 +27,7 @@ type KubernetesSettings struct {
 	// is enabled; set false to run as a generic YAML language server.
 	Enabled *bool `json:"enabled,omitempty"`
 	// SchemaURL templates per-document apiVersion+kind auto-detect.
-	// See schema.BuildK8sURL for supported placeholders.
+	// See internal/schema/k8s.go for supported placeholders and expressions.
 	SchemaURL string `json:"schemaUrl,omitempty"`
 }
 
