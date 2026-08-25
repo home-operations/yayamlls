@@ -25,6 +25,9 @@ const DefaultK8sSchemaURL = "https://k8s-schemas.home-operations.com/" +
 //	{var:+word}     "word" if var is non-empty, else ""
 //	{var@U}         var but uppercased
 //	{var@L}         var but lowercased
+//
+// Nested expressions: an operand or word may itself be an {expression}, evaluated
+// before the surrounding one, e.g. {{group:-core}@U} yields "CORE" for core.
 func BuildK8sURL(template, group, version, kind string) (string, error) {
 	if version == "" || kind == "" {
 		return "", nil
@@ -76,8 +79,23 @@ func (exprNode) isNode() {}
 // exprBody is an {expression}: a bare operand, or "operand <expr> word".
 type exprBody struct {
 	expr    expression
-	operand string
-	word    string
+	operand term
+	word    term
+}
+
+// termKind discriminates a term: operand references a var by name, word is literal.
+type termKind int
+
+const (
+	termOperand termKind = iota
+	termWord
+)
+
+// term is an operand or word: a var name or literal, or a nested {expression}.
+type term struct {
+	kind   termKind
+	raw    string
+	nested *exprBody
 }
 
 // operator identifies a {var@op} operator.
@@ -103,7 +121,11 @@ func parseTemplate(template string) ([]node, error) {
 			if !ok {
 				return nil, fmt.Errorf("unterminated expression at %d", i)
 			}
-			nodes = append(nodes, exprNode{body: parseBody(template[i+1 : end-1])})
+			body, err := parseBody(template[i+1 : end-1])
+			if err != nil {
+				return nil, fmt.Errorf("%w at %d", err, i)
+			}
+			nodes = append(nodes, exprNode{body: body})
 			i = end
 		case '}':
 			return nil, fmt.Errorf("unexpected '}' at %d", i)
@@ -118,16 +140,34 @@ func parseTemplate(template string) ([]node, error) {
 	return nodes, nil
 }
 
-func parseBody(body string) *exprBody {
+func parseBody(body string) (*exprBody, error) {
 	exp, idx := findExpression(body)
 	eb := &exprBody{expr: exp}
+	var err error
 	if exp == expressionNone {
-		eb.operand = body
-		return eb
+		eb.operand, err = parseTerm(body, termOperand)
+		return eb, err
 	}
-	eb.operand = body[:idx]
-	eb.word = body[idx+len(exp.separator()):]
-	return eb
+	eb.operand, err = parseTerm(body[:idx], termOperand)
+	if err != nil {
+		return nil, err
+	}
+	eb.word, err = parseTerm(body[idx+len(exp.separator()):], termWord)
+	if err != nil {
+		return nil, err
+	}
+	return eb, nil
+}
+
+func parseTerm(s string, kind termKind) (term, error) {
+	if s != "" && s[0] == '{' {
+		if end, ok := matchBraces(s, 0); ok && end == len(s) {
+			nested, err := parseBody(s[1 : len(s)-1])
+			return term{kind: kind, nested: nested}, err
+		}
+		return term{}, fmt.Errorf("unbalanced nested expression %q", s)
+	}
+	return term{kind: kind, raw: s}, nil
 }
 
 func parseOperator(word string) operator {
@@ -176,35 +216,49 @@ func evalNodes(nodes []node, vars map[string]string) (string, error) {
 func evalBody(eb *exprBody, vars map[string]string) (string, error) {
 	switch eb.expr {
 	case expressionNone:
-		val, ok := vars[eb.operand]
-		if !ok {
-			return "", fmt.Errorf("unknown placeholder %q", eb.operand)
-		}
-		return val, nil
+		return evalTerm(eb.operand, vars)
 	case expressionDefault:
-		if val, ok := vars[eb.operand]; ok && val != "" {
+		if val, err := evalTerm(eb.operand, vars); err == nil && val != "" {
 			return val, nil
 		}
-		return eb.word, nil
+		return evalTerm(eb.word, vars)
 	case expressionAlt:
-		if val, ok := vars[eb.operand]; ok && val != "" {
-			return eb.word, nil
+		if val, err := evalTerm(eb.operand, vars); err == nil && val != "" {
+			return evalTerm(eb.word, vars)
 		}
 		return "", nil
 	case expressionOperator:
-		val, ok := vars[eb.operand]
-		if !ok {
-			return "", fmt.Errorf("unknown placeholder %q", eb.operand)
+		val, err := evalTerm(eb.operand, vars)
+		if err != nil {
+			return "", err
 		}
-		switch parseOperator(eb.word) {
+		switch parseOperator(eb.word.raw) {
 		case operatorUpper:
 			return strings.ToUpper(val), nil
 		case operatorLower:
 			return strings.ToLower(val), nil
 		}
-		return "", fmt.Errorf("undefined operator %q on {%s}", eb.word, eb.operand)
+		return "", fmt.Errorf("undefined operator %q on {%s}", eb.word.raw, eb.operand.raw)
 	default:
 		return "", fmt.Errorf("expression %d not implemented", eb.expr)
+	}
+}
+
+func evalTerm(t term, vars map[string]string) (string, error) {
+	if t.nested != nil {
+		return evalBody(t.nested, vars)
+	}
+	switch t.kind {
+	case termOperand:
+		val, ok := vars[t.raw]
+		if !ok {
+			return "", fmt.Errorf("unknown placeholder %q", t.raw)
+		}
+		return val, nil
+	case termWord:
+		return t.raw, nil
+	default:
+		return "", fmt.Errorf("unknown term kind %d", t.kind)
 	}
 }
 

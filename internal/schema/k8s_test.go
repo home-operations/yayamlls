@@ -261,6 +261,101 @@ func TestBuildK8sURL_ExprUndefinedOperator(t *testing.T) {
 	}
 }
 
+func TestBuildK8sURL_NestedExpressions(t *testing.T) {
+	tests := []struct {
+		name  string
+		tmpl  string
+		group string
+		want  string
+	}{
+		{
+			name:  "empty group uppercased fallback",
+			tmpl:  "{{group:-core}@U}",
+			group: "",
+			want:  "CORE",
+		},
+		{
+			name:  "grouped group uppercased",
+			tmpl:  "{{group:-core}@U}",
+			group: "apps",
+			want:  "APPS",
+		},
+		{
+			name:  "empty group lowercased fallback",
+			tmpl:  "{{group:-Core}@L}",
+			group: "",
+			want:  "core",
+		},
+		{
+			name:  "nested operand lowercased then defaulted",
+			tmpl:  "{{group@L}:-core}",
+			group: "APPS",
+			want:  "apps",
+		},
+		{
+			name:  "nested operand lowercased empty uses fallback",
+			tmpl:  "{{group@L}:-Core}",
+			group: "",
+			want:  "Core",
+		},
+		{
+			name:  "nested expression in fallback word",
+			tmpl:  "{group:-{kind@U}}",
+			group: "",
+			want:  "DEPLOYMENT",
+		},
+		{
+			name:  "nested word only when value empty",
+			tmpl:  "{group:-{kind@L}}",
+			group: "apps",
+			want:  "apps",
+		},
+		{
+			name:  "nested in url",
+			tmpl:  "https://schemas.example.com/{{group:-core}@U}/{kind@L}.json",
+			group: "",
+			want:  "https://schemas.example.com/CORE/deployment.json",
+		},
+		{
+			name:  "depth 3 lowercased fallback",
+			tmpl:  "{{{group:-core}@U}@L}",
+			group: "",
+			want:  "core",
+		},
+		{
+			name:  "depth 3 lowercased value",
+			tmpl:  "{{{group:-core}@U}@L}",
+			group: "apps",
+			want:  "apps",
+		},
+		{
+			name:  "depth 4 uppercased fallback",
+			tmpl:  "{{{{group:-core}@U}@L}@U}",
+			group: "",
+			want:  "CORE",
+		},
+		{
+			name:  "depth 4 uppercased value",
+			tmpl:  "{{{{group:-core}@U}@L}@U}",
+			group: "apps",
+			want:  "APPS",
+		},
+		{
+			name:  "operator outside braces is literal",
+			tmpl:  "{group:-core}@U",
+			group: "",
+			want:  "core@U",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := buildK8sURL(t, tc.tmpl, tc.group, "v1", "Deployment"); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestBuildK8sURL_UnbalancedBraces(t *testing.T) {
 	tests := []struct {
 		name string
