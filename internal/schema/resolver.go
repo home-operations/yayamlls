@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,6 +19,7 @@ type Resolver struct {
 	mu         sync.RWMutex
 	settings   config.Settings
 	catalog    *Catalog
+	k8sTmpl    *k8sTemplate
 	reloadHook func()
 }
 
@@ -37,8 +39,11 @@ func (r *Resolver) SetReloadHook(fn func()) {
 }
 
 func (r *Resolver) SetSettings(s config.Settings) {
+	k8sTmpl := k8sTemplateFor(s)
+
 	r.mu.Lock()
 	r.settings = s
+	r.k8sTmpl = k8sTmpl
 	var toLoad *Catalog
 	if s.CatalogEnabled() {
 		if r.catalog == nil || r.catalog.URL != effectiveCatalogURL(s) {
@@ -54,6 +59,27 @@ func (r *Resolver) SetSettings(s config.Settings) {
 	if toLoad != nil {
 		toLoad.Load(hook)
 	}
+}
+
+func k8sTemplateFor(s config.Settings) *k8sTemplate {
+	if !s.KubernetesEnabled() {
+		return nil
+	}
+	spec := ""
+	if s.Kubernetes != nil {
+		spec = s.Kubernetes.SchemaURL
+	}
+	tmpl, err := parseK8sTemplate(spec)
+	if err != nil {
+		slog.Warn(
+			"schema: invalid kubernetes.schemaUrl template",
+			"template",
+			spec,
+			"error",
+			err)
+		return nil
+	}
+	return tmpl
 }
 
 func effectiveCatalogURL(s config.Settings) string {
@@ -166,14 +192,10 @@ func (r *Resolver) K8sURLForNode(body ast.Node) string {
 
 func (r *Resolver) K8sURL(gvk GVK) string {
 	r.mu.RLock()
-	enabled := r.settings.KubernetesEnabled()
-	tmpl := ""
-	if r.settings.Kubernetes != nil {
-		tmpl = r.settings.Kubernetes.SchemaURL
-	}
+	tmpl := r.k8sTmpl
 	r.mu.RUnlock()
-	if !enabled {
+	if tmpl == nil {
 		return ""
 	}
-	return BuildK8sURL(tmpl, gvk.Group, gvk.Version, gvk.Kind)
+	return tmpl.Render(gvk.Group, gvk.Version, gvk.Kind)
 }
