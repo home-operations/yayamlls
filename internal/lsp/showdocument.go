@@ -52,7 +52,7 @@ func (s *Server) showInEditor(call glsp.CallFunc, uri, kind string) {
 	var res protocol.ShowDocumentResult
 	call(protocol.ServerWindowShowDocument, protocol.ShowDocumentParams{
 		URI:       fileuri.FromPath(path),
-		TakeFocus: ptr(true),
+		TakeFocus: new(true),
 	}, &res)
 }
 

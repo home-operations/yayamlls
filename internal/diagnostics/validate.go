@@ -66,21 +66,20 @@ func validateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string, opts
 	value, err := yamlast.Decode(doc)
 	if err != nil {
 		return []protocol.Diagnostic{{
-			Severity: ptr(protocol.DiagnosticSeverityError),
-			Source:   ptr(Source),
+			Severity: new(protocol.DiagnosticSeverityError),
+			Source:   new(Source),
 			Message:  fmt.Sprintf("decode: %v", err),
 			Range:    yamlast.LocateRange(doc, "", src),
 		}}
 	}
 	value = normalizeMergeDirectives(value)
 	if err := sch.Validate(value); err != nil {
-		var verr *jsonschema.ValidationError
-		if errors.As(err, &verr) {
+		if verr, ok := errors.AsType[*jsonschema.ValidationError](err); ok {
 			return flattenValidationError(doc, verr, src, opts)
 		}
 		return []protocol.Diagnostic{{
-			Severity: ptr(protocol.DiagnosticSeverityError),
-			Source:   ptr(Source),
+			Severity: new(protocol.DiagnosticSeverityError),
+			Source:   new(Source),
 			Message:  err.Error(),
 			Range:    yamlast.LocateRange(doc, "", src),
 		}}
@@ -108,8 +107,8 @@ func flattenValidationError(
 			return protocol.Diagnostic{}, true
 		}
 		return protocol.Diagnostic{
-			Severity: ptr(protocol.DiagnosticSeverityError),
-			Source:   ptr(Source),
+			Severity: new(protocol.DiagnosticSeverityError),
+			Source:   new(Source),
 			Message:  fmt.Sprintf("%s (at %s)", Message(e), displayPointer(Pointer(e.InstanceLocation))),
 			Range:    leafRange(doc, e, src),
 			Data:     dataFor(e),
@@ -380,8 +379,8 @@ func displayPointer(p string) string {
 func parseErrorDiag(err error) protocol.Diagnostic {
 	rng, msg := parseErrorLocation(err.Error())
 	return protocol.Diagnostic{
-		Severity: ptr(protocol.DiagnosticSeverityError),
-		Source:   ptr(Source),
+		Severity: new(protocol.DiagnosticSeverityError),
+		Source:   new(Source),
 		Message:  msg,
 		Range:    rng,
 	}
@@ -412,12 +411,12 @@ func parseErrorLocation(s string) (protocol.Range, string) {
 }
 
 func splitLineCol(s string) (line, col int, ok bool) {
-	colon := strings.IndexByte(s, ':')
-	if colon < 0 {
+	before, after, ok := strings.Cut(s, ":")
+	if !ok {
 		return 0, 0, false
 	}
-	line, err1 := strconv.Atoi(s[:colon])
-	col, err2 := strconv.Atoi(s[colon+1:])
+	line, err1 := strconv.Atoi(before)
+	col, err2 := strconv.Atoi(after)
 	return line, col, err1 == nil && err2 == nil
 }
 
@@ -427,5 +426,3 @@ func oneBasedToZero(n int) uint32 {
 	}
 	return 0
 }
-
-func ptr[T any](v T) *T { return &v }
