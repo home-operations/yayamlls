@@ -25,14 +25,16 @@ func TestMultiDocMixedKinds(t *testing.T) {
 	if err := os.MkdirAll(schemaDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Each schema pins its own kind so a document validated against a
+	// sibling's schema produces an extra diagnostic and fails the exact
+	// count below.
 	schemas := map[string]string{
-		"namespace.json": `{}`,
-		"service.json":   `{}`,
+		"namespace.json": `{"properties": {"kind": {"const": "Namespace"}}}`,
+		"service.json":   `{"properties": {"kind": {"const": "Service"}}}`,
 		"deployment.json": `{
-  "type": "object",
   "properties": {
+    "kind": { "const": "Deployment" },
     "spec": {
-      "type": "object",
       "properties": { "replicas": { "type": "integer" } }
     }
   }
