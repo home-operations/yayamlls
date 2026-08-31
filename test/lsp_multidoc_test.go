@@ -17,11 +17,33 @@ func TestMultiDocMixedKinds(t *testing.T) {
 	bin := buildBinary(t)
 
 	root := t.TempDir()
-	// Pin yannh so the test doesn't depend on what the default mirror hosts.
-	cfg := `kubernetes:
-  schemaUrl: "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master-standalone-strict/{kind@L}-{groupFirst}{groupFirst:+-}{version}.json"
-catalog: false
-`
+	// Serve the kind schemas from disk so the test passes without network
+	// access (distro package builds run sandboxed). A fetch failure on an
+	// auto-detected kind yields zero diagnostics, which would look like a
+	// validation bug instead of a missing schema.
+	schemaDir := filepath.Join(root, "schemas")
+	if err := os.MkdirAll(schemaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	schemas := map[string]string{
+		"namespace.json": `{}`,
+		"service.json":   `{}`,
+		"deployment.json": `{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "object",
+      "properties": { "replicas": { "type": "integer" } }
+    }
+  }
+}`,
+	}
+	for name, body := range schemas {
+		if err := os.WriteFile(filepath.Join(schemaDir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := "kubernetes:\n  schemaUrl: \"file://" + schemaDir + "/{kind@L}.json\"\ncatalog: false\n"
 	if err := os.WriteFile(filepath.Join(root, ".yayamlls.yaml"), []byte(cfg), 0o644); err != nil {
 		t.Fatal(err)
 	}
