@@ -65,7 +65,7 @@ func FindModelineSchema(text string) string {
 			continue
 		}
 		rest := strings.TrimSpace(strings.TrimPrefix(line, modelinePrefix))
-		for _, kv := range strings.Fields(rest) {
+		for kv := range strings.FieldsSeq(rest) {
 			k, v, ok := strings.Cut(kv, "=")
 			if !ok {
 				continue

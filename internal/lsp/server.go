@@ -150,7 +150,7 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	caps := s.handler.CreateServerCapabilities()
 	change := protocol.TextDocumentSyncKindIncremental
 	caps.TextDocumentSync = &protocol.TextDocumentSyncOptions{
-		OpenClose: ptr(true),
+		OpenClose: new(true),
 		Change:    &change,
 	}
 	caps.ExecuteCommandProvider = &protocol.ExecuteCommandOptions{
@@ -168,7 +168,7 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	// this capability, and clients withhold the notification until it's declared.
 	caps.Workspace = &protocol.ServerCapabilitiesWorkspace{
 		WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{
-			Supported:           ptr(true),
+			Supported:           new(true),
 			ChangeNotifications: &protocol.BoolOrString{Value: true},
 		},
 	}
@@ -394,8 +394,6 @@ func (s *Server) setTrace(ctx *glsp.Context, params *protocol.SetTraceParams) er
 func (s *Server) cancelRequest(ctx *glsp.Context, params *protocol.CancelParams) error {
 	return nil
 }
-
-func ptr[T any](v T) *T { return &v }
 
 // diagnosticOptions derives the validation options from the current
 // effective settings.

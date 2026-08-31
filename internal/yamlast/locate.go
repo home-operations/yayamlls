@@ -104,7 +104,7 @@ func lookup(doc *ast.DocumentNode, ptr string) (ast.Node, bool) {
 		return doc.Body, true
 	}
 	node := doc.Body
-	for _, raw := range strings.Split(strings.TrimPrefix(ptr, "/"), "/") {
+	for raw := range strings.SplitSeq(strings.TrimPrefix(ptr, "/"), "/") {
 		next, ok := descend(node, unescapePointerSegment(raw))
 		if !ok {
 			return nil, false
@@ -216,10 +216,7 @@ func tokenEnd(src string, t *token.Token) protocol.Position {
 // counts UTF-16 code units. src supplies the line so columns past a
 // non-BMP rune are translated correctly.
 func UTF16Position(src string, line, runeCol int) protocol.Position {
-	l := line - 1
-	if l < 0 {
-		l = 0
-	}
+	l := max(line-1, 0)
 	txt, _ := lineText(src, l)
 	return protocol.Position{Line: uint32(l), Character: utf16Column(txt, runeCol)}
 }

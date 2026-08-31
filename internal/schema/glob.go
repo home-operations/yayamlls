@@ -36,8 +36,7 @@ func globMatch(pat, s string) bool {
 		if pat == "" {
 			return s == ""
 		}
-		if strings.HasPrefix(pat, "**") {
-			rest := strings.TrimPrefix(pat, "**")
+		if rest, ok := strings.CutPrefix(pat, "**"); ok {
 			rest = strings.TrimPrefix(rest, "/")
 			if rest == "" {
 				return true

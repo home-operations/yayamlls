@@ -2,6 +2,7 @@ package completion
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -101,8 +102,8 @@ func propertyCompletions(s *jsonschema.Schema, ic insertCtx) *protocol.Completio
 			Kind:          &kind,
 			Detail:        detail(ps),
 			Documentation: documentation(ps),
-			InsertText:    ptrStr(insert),
-			SortText:      ptrStr(sortKey(k, required[k])),
+			InsertText:    new(insert),
+			SortText:      new(sortKey(k, required[k])),
 		}
 		if isSnippet {
 			f := protocol.InsertTextFormatSnippet
@@ -149,12 +150,7 @@ func isType(s *jsonschema.Schema, t string) bool {
 	if s == nil || s.Types == nil {
 		return false
 	}
-	for _, st := range s.Types.ToStrings() {
-		if st == t {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.Types.ToStrings(), t)
 }
 
 // snippetEscape escapes the characters the LSP snippet grammar reserves.
@@ -180,7 +176,7 @@ func valueCompletions(s *jsonschema.Schema, ic insertCtx) *protocol.CompletionLi
 		if ic.needSpace {
 			// Right after "key:": insert " value" but keep the label bare so
 			// client-side filtering still matches what the user types.
-			item.InsertText = ptrStr(" " + item.Label)
+			item.InsertText = new(" " + item.Label)
 		}
 		items = append(items, item)
 	}
@@ -261,5 +257,3 @@ func sortKey(name string, required bool) string {
 	}
 	return "1" + name
 }
-
-func ptrStr(s string) *string { return &s }
