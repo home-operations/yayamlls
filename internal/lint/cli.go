@@ -157,7 +157,7 @@ func validateFile(
 					// defect: warn, don't fail CI. Schema violations of rendered
 					// manifests still come back as errors.
 					for i := range rendered {
-						rendered[i].Severity = ptr(protocol.DiagnosticSeverityWarning)
+						rendered[i].Severity = new(protocol.DiagnosticSeverityWarning)
 					}
 				}
 				diags = append(diags, rendered...)

@@ -214,7 +214,7 @@ func TestConcurrent_NotifyAndClose(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		for i := 0; i < 200; i++ {
+		for range 200 {
 			s.Notify(uri, &render.RenderedOutput{Raw: []byte("v")}, nil)
 			_ = s.didClose(ctx, &protocol.DidCloseTextDocumentParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri},

@@ -65,7 +65,7 @@ func TestMatchSettings_DeterministicMostSpecific(t *testing.T) {
 	if first != "./b.json" {
 		t.Fatalf("matchSettings = %q, want ./b.json (most specific)", first)
 	}
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		if got := matchSettings(schemas, docPath); got != first {
 			t.Fatalf("nondeterministic: call %d returned %q, want %q", i, got, first)
 		}

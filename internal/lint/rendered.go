@@ -26,8 +26,8 @@ func RenderedDiagnostics(
 			return nil
 		}
 		return []protocol.Diagnostic{{
-			Severity: ptr(protocol.DiagnosticSeverityError),
-			Source:   ptr(renderSource(out)),
+			Severity: new(protocol.DiagnosticSeverityError),
+			Source:   new(renderSource(out)),
 			Message:  "render: " + err.Error(),
 			Range:    protocol.Range{},
 		}}
@@ -48,20 +48,19 @@ func RenderedDiagnostics(
 		value, err := yamlast.Decode(m.AST)
 		if err != nil {
 			diags = append(diags, protocol.Diagnostic{
-				Severity: ptr(protocol.DiagnosticSeverityWarning),
-				Source:   ptr(renderSource(out)),
+				Severity: new(protocol.DiagnosticSeverityWarning),
+				Source:   new(renderSource(out)),
 				Message:  fmt.Sprintf("[rendered %s/%s] decode failed: %v", m.GVK.Kind, m.Name, err),
 			})
 			continue
 		}
 		if err := sch.Validate(value); err != nil {
-			var verr *jsonschema.ValidationError
-			if errors.As(err, &verr) {
+			if verr, ok := errors.AsType[*jsonschema.ValidationError](err); ok {
 				diags = append(diags, flattenRendered(out, m, verr, opts)...)
 			} else {
 				diags = append(diags, protocol.Diagnostic{
-					Severity: ptr(protocol.DiagnosticSeverityError),
-					Source:   ptr(renderSource(out)),
+					Severity: new(protocol.DiagnosticSeverityError),
+					Source:   new(renderSource(out)),
 					Message:  fmt.Sprintf("[rendered %s/%s] %s", m.GVK.Kind, m.Name, err.Error()),
 				})
 			}
@@ -83,7 +82,7 @@ func flattenRendered(
 			loc = "/"
 		}
 		return protocol.Diagnostic{
-			Severity: ptr(protocol.DiagnosticSeverityError),
+			Severity: new(protocol.DiagnosticSeverityError),
 			Source:   &src,
 			Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, diagnostics.Message(e)),
 		}, false
@@ -96,5 +95,3 @@ func renderSource(out *render.RenderedOutput) string {
 	}
 	return diagnostics.Source + "/" + out.Provider
 }
-
-func ptr[T any](v T) *T { return &v }

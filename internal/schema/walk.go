@@ -18,7 +18,7 @@ func Resolve(root *jsonschema.Schema, ptr string) *jsonschema.Schema {
 	if ptr == "" || ptr == "/" {
 		return cur
 	}
-	for _, seg := range strings.Split(strings.TrimPrefix(ptr, "/"), "/") {
+	for seg := range strings.SplitSeq(strings.TrimPrefix(ptr, "/"), "/") {
 		next := step(cur, unescape(seg))
 		if next == nil {
 			return nil
