@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/home-operations/flate v0.6.2
+	github.com/home-operations/flate v0.6.5
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tliron/commonlog v0.2.21
 	github.com/tliron/glsp v0.2.2
@@ -33,7 +33,7 @@ require (
 	github.com/chai2010/gettext-go v1.0.3 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
-	github.com/controlplaneio-fluxcd/flux-operator v0.58.1 // indirect
+	github.com/controlplaneio-fluxcd/flux-operator v0.59.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -45,15 +45,15 @@ require (
 	github.com/extism/go-sdk v1.7.1 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fluxcd/cli-utils v1.2.2 // indirect
-	github.com/fluxcd/helm-controller/api v1.6.3 // indirect
-	github.com/fluxcd/kustomize-controller/api v1.9.4 // indirect
+	github.com/fluxcd/helm-controller/api v1.6.4 // indirect
+	github.com/fluxcd/kustomize-controller/api v1.9.5 // indirect
 	github.com/fluxcd/pkg/apis/acl v0.10.0 // indirect
 	github.com/fluxcd/pkg/apis/kustomize v1.20.0 // indirect
 	github.com/fluxcd/pkg/apis/meta v1.31.0 // indirect
-	github.com/fluxcd/pkg/envsubst v1.7.0 // indirect
-	github.com/fluxcd/pkg/kustomize v1.39.0 // indirect
+	github.com/fluxcd/pkg/envsubst v1.8.0 // indirect
+	github.com/fluxcd/pkg/kustomize v1.40.0 // indirect
 	github.com/fluxcd/pkg/sourceignore v0.18.0 // indirect
-	github.com/fluxcd/source-controller/api v1.9.4 // indirect
+	github.com/fluxcd/source-controller/api v1.9.5 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -94,7 +94,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
-	github.com/klauspost/compress v1.19.2 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
