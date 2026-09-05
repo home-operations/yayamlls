@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.1](https://github.com/home-operations/yayamlls/compare/0.3.0...0.3.1) (2026-09-05)
+
+
+### Features
+
+* **npm:** update dependency vscode (1.135.0 → 1.136.0) ([#183](https://github.com/home-operations/yayamlls/issues/183)) ([f39e95f](https://github.com/home-operations/yayamlls/commit/f39e95fbf4b5a6c539786d507c8294e9209fee54))
+
+
+### Bug Fixes
+
+* **go:** update module github.com/home-operations/flate (v0.6.1 → v0.6.2) ([#180](https://github.com/home-operations/yayamlls/issues/180)) ([983f838](https://github.com/home-operations/yayamlls/commit/983f838619a92ff4556b191eed725a5b505df589))
+* **go:** update module github.com/home-operations/flate (v0.6.2 → v0.6.5) ([#182](https://github.com/home-operations/yayamlls/issues/182)) ([b867e80](https://github.com/home-operations/yayamlls/commit/b867e80d85e77f841bcaa53b0c54c67e1a41b662))
+* **npm:** update dependency vscode (1.136.0 → 1.136.1) ([#185](https://github.com/home-operations/yayamlls/issues/185)) ([43bbe13](https://github.com/home-operations/yayamlls/commit/43bbe139a6d820bd3e5b714b643f2bcfbf3ab9df))
+
+
+### Miscellaneous Chores
+
+* **github-action:** update action anchore/sbom-action (v0.24.1 → v0.24.2) ([#179](https://github.com/home-operations/yayamlls/issues/179)) ([cd1ae03](https://github.com/home-operations/yayamlls/commit/cd1ae034ff7b4fbfc1ac441a84b2ad58ab6a592e))
+* **mise:** update tool go (1.27.0 → 1.27.1) ([#187](https://github.com/home-operations/yayamlls/issues/187)) ([720ed40](https://github.com/home-operations/yayamlls/commit/720ed4079f7c735b9addc610696c12b57155451e))
+* **mise:** update tool oxfmt (0.65.0 → 0.66.0) ([#186](https://github.com/home-operations/yayamlls/issues/186)) ([d9491e5](https://github.com/home-operations/yayamlls/commit/d9491e580ed82f08c50635acc7d5c50d4bfee466))
+* **mise:** update tool zizmor (1.29.0 → 1.30.0) ([#184](https://github.com/home-operations/yayamlls/issues/184)) ([350b256](https://github.com/home-operations/yayamlls/commit/350b25692cfc980e7d7b0ab0151f164a4fa1bfb0))
+
 ## [0.3.0](https://github.com/home-operations/yayamlls/compare/0.2.0...0.3.0) (2026-08-31)
 
 
