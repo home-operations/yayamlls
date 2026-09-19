@@ -24,7 +24,7 @@ permissions:
 jobs:
   vscode:
     name: Build VS Code Extension
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: editors/vscode
@@ -67,7 +67,7 @@ jobs:
 
   zed:
     name: Build Zed Extension
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: editors/zed
