@@ -176,6 +176,26 @@ func TestDidChangeWatchedFiles_InvalidatesRendererTrees(t *testing.T) {
 	}
 }
 
+func TestDidSave_InvalidatesRendererTrees(t *testing.T) {
+	reg := render.NewRegistry()
+	fr := &fakeTreeRenderer{}
+	reg.Register(fr)
+	rec := &recorder{}
+	ctx := rec.ctx()
+	s := New("test", reg)
+
+	if err := s.didSave(ctx, &protocol.DidSaveTextDocumentParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///ws/apps/kustomization.yaml"},
+	}); err != nil {
+		t.Fatalf("didSave: %v", err)
+	}
+	fr.mu.Lock()
+	defer fr.mu.Unlock()
+	if len(fr.invalidated) != 1 || fr.invalidated[0] != "/ws/apps/kustomization.yaml" {
+		t.Fatalf("InvalidateTree calls = %+v", fr.invalidated)
+	}
+}
+
 func TestInitialized_RegistersWatchersForNonYAMLRenderInputs(t *testing.T) {
 	rec := &registrationRecorder{}
 	ctx := rec.ctx()

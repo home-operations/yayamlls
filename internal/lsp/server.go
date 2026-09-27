@@ -119,6 +119,7 @@ func New(version string, registry *render.Registry) *Server {
 		TextDocumentDidOpen:   s.didOpen,
 		TextDocumentDidChange: s.didChange,
 		TextDocumentDidClose:  s.didClose,
+		TextDocumentDidSave:   s.didSave,
 
 		TextDocumentHover:          s.hover,
 		TextDocumentCompletion:     s.completion,
@@ -152,6 +153,7 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	caps.TextDocumentSync = &protocol.TextDocumentSyncOptions{
 		OpenClose: new(true),
 		Change:    &change,
+		Save:      &protocol.SaveOptions{},
 	}
 	caps.ExecuteCommandProvider = &protocol.ExecuteCommandOptions{
 		Commands: []string{CommandShowRendered, CommandShowRenderedDiff},
