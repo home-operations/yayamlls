@@ -11,13 +11,7 @@
       "name": "yayamlls",
       "source": "./editors/claude",
       "description": "Schema-driven YAML diagnostics, completion, hover, and Flux rendering, powered by the yayamlls language server.",
-      "keywords": [
-        "yaml",
-        "lsp",
-        "kubernetes",
-        "flux",
-        "json-schema"
-      ]
+      "keywords": ["yaml", "lsp", "kubernetes", "flux", "json-schema"]
     }
   ]
 }

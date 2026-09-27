@@ -47,6 +47,12 @@ func (s *Server) didChange(ctx *glsp.Context, params *protocol.DidChangeTextDocu
 	return nil
 }
 
+func (s *Server) didSave(ctx *glsp.Context, params *protocol.DidSaveTextDocumentParams) error {
+	return s.didChangeWatchedFiles(ctx, &protocol.DidChangeWatchedFilesParams{
+		Changes: []protocol.FileEvent{{URI: params.TextDocument.URI, Type: protocol.FileChangeTypeChanged}},
+	})
+}
+
 func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
 	uri := params.TextDocument.URI
 	s.cancelDebounce(uri)

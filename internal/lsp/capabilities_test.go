@@ -32,6 +32,20 @@ func TestInitialize_CompletionCapabilities(t *testing.T) {
 	}
 }
 
+func TestInitialize_SaveCapability(t *testing.T) {
+	rec := &recorder{}
+	s := New("test", render.NewRegistry())
+
+	res, err := s.initialize(rec.ctx(), &protocol.InitializeParams{})
+	if err != nil {
+		t.Fatalf("initialize: %v", err)
+	}
+	opts, ok := res.(protocol.InitializeResult).Capabilities.TextDocumentSync.(*protocol.TextDocumentSyncOptions)
+	if !ok || opts.Save == nil {
+		t.Fatalf("textDocumentSync.save not declared: %+v", opts)
+	}
+}
+
 func TestInitialize_CapturesSnippetSupport(t *testing.T) {
 	rec := &recorder{}
 	s := New("test", render.NewRegistry())

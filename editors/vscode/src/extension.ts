@@ -7,11 +7,7 @@ import {
   workspace,
   WorkspaceConfiguration,
 } from "vscode";
-import {
-  LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 import { ensureBinary } from "./download";
 
 const YAMLLS_REPO = "home-operations/yayamlls";
@@ -106,12 +102,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
       },
     },
   };
-  client = new LanguageClient(
-    "yayamlls",
-    "yayamlls",
-    serverOptions,
-    clientOptions,
-  );
+  client = new LanguageClient("yayamlls", "yayamlls", serverOptions, clientOptions);
   await client.start();
 
   // Push settings to the server when yayamlls.* config changes.
