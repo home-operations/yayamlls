@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.2](https://github.com/home-operations/yayamlls/compare/0.3.1...0.3.2) (2026-09-25)
+
+
+### Features
+
+* **npm:** update dependency @types/node (24.13.6 → 24.19.0) ([#209](https://github.com/home-operations/yayamlls/issues/209)) ([f7db3a8](https://github.com/home-operations/yayamlls/commit/f7db3a8c9204014ecb592cd16648e4161f21ed3a))
+* **npm:** update dependency vscode (1.138.0 → 1.139.0) ([#203](https://github.com/home-operations/yayamlls/issues/203)) ([6d876b5](https://github.com/home-operations/yayamlls/commit/6d876b51ae4457cb9c4b85687faf4f7928b75a56))
+
+
+### Bug Fixes
+
+* **npm:** update dependency vscode (1.139.0 → 1.139.1) ([#207](https://github.com/home-operations/yayamlls/issues/207)) ([1e23380](https://github.com/home-operations/yayamlls/commit/1e233803c4545228d1f08f5bace6ae25de8ea4db))
+* **npm:** update dependency vscode-languageclient (10.1.1 → 10.1.2) ([#208](https://github.com/home-operations/yayamlls/issues/208)) ([0d66011](https://github.com/home-operations/yayamlls/commit/0d660119406e195d96ba16dd5398ca1a2d8f82b7))
+
+
+### Miscellaneous Chores
+
+* **mise:** update tool oxfmt (0.68.0 → 0.70.0) ([#205](https://github.com/home-operations/yayamlls/issues/205)) ([b5d73f0](https://github.com/home-operations/yayamlls/commit/b5d73f02d606816b614958ce670b1f651e028145))
+* **mise:** update tool oxfmt (0.69.0 → 0.70.0) ([#206](https://github.com/home-operations/yayamlls/issues/206)) ([7e532cd](https://github.com/home-operations/yayamlls/commit/7e532cd831d4ff9c2a67fe7c25b1fbbb4a060c48))
+
 ## [0.3.1](https://github.com/home-operations/yayamlls/compare/0.3.0...0.3.1) (2026-09-19)
 
 
