@@ -75,12 +75,14 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/home-operations/yayamlls
     description: YAML language server with pluggable rendering for Flux sources.
-    # Binaries aren't notarized, so strip the quarantine bit so macOS doesn't
-    # block the first run with "developer cannot be verified".
-    hooks:
-      post:
-        install: |
-          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/yayamlls"] if OS.mac?
+    # GoReleaser does not yet expose Homebrew's structured flight steps, so use
+    # a custom block instead of hooks, which generate deprecated Ruby stanzas.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "yayamlls"], chdir: "."
+        end
+      end
 
 # release-please creates the GitHub Release with the changelog; goreleaser
 # attaches binaries/sboms/sigs to it.
