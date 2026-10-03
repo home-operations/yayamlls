@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.3](https://github.com/home-operations/yayamlls/compare/0.3.2...0.3.3) (2026-10-03)
+
+
+### Documentation
+
+* **agents:** point to the org AI Usage Policy instead of restating it ([1e8e003](https://github.com/home-operations/yayamlls/commit/1e8e00316bdafb5e1c1df360657837307f8a0fdd))
+* **agents:** update AI usage policy summary ([fae72aa](https://github.com/home-operations/yayamlls/commit/fae72aa28f760b412ad52c576cd26392d395a61f))
+
+
+### Miscellaneous Chores
+
+* **github-action:** update action jdx/mise-action (v4.3.0 → v5.0.0) ([#214](https://github.com/home-operations/yayamlls/issues/214)) ([08cb76a](https://github.com/home-operations/yayamlls/commit/08cb76addd7c0106300862cc5afa440117566d2c))
+* **mise:** update tool golangci-lint (2.13.2 → 2.14.0) ([#210](https://github.com/home-operations/yayamlls/issues/210)) ([760832c](https://github.com/home-operations/yayamlls/commit/760832c82a61fd8a06507d9b7603e896a26c49b1))
+* **mise:** update tool lefthook (2.1.14 → 2.1.15) ([#215](https://github.com/home-operations/yayamlls/issues/215)) ([8813966](https://github.com/home-operations/yayamlls/commit/88139667d8d9e6a0c669c19c9d452874b160619e))
+* **mise:** update tool oxfmt (0.70.0 → 0.71.0) ([#213](https://github.com/home-operations/yayamlls/issues/213)) ([cb07000](https://github.com/home-operations/yayamlls/commit/cb07000e23e8eb8594dc0f20d219dab642c4793c))
+* **mise:** upgrade lockfile to format revision 3 ([4b42997](https://github.com/home-operations/yayamlls/commit/4b42997edbbfa1d7e70719859a456f0be193880d))
+* **oxfmt:** ignore mise lock sidecars ([cbccc62](https://github.com/home-operations/yayamlls/commit/cbccc62a39da6b8d609aa398fff6b281157678f0))
+
 ## [0.3.2](https://github.com/home-operations/yayamlls/compare/0.3.1...0.3.2) (2026-09-25)
 
 
