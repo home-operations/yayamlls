@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.3.3](https://github.com/home-operations/yayamlls/compare/0.3.2...0.3.3) (2026-10-17)
+
+
+### Bug Fixes
+
+* **npm:** update dependency @types/node (24.19.0 → 24.19.1) ([#220](https://github.com/home-operations/yayamlls/issues/220)) ([bd219f4](https://github.com/home-operations/yayamlls/commit/bd219f4782a5a9c81b695c68fe856ba2f5afb02a))
+* **npm:** update dependency @types/node (24.19.1 → 24.19.2) ([#231](https://github.com/home-operations/yayamlls/issues/231)) ([f9af86b](https://github.com/home-operations/yayamlls/commit/f9af86b6516102d081213612cf9fff86bb520d27))
+
+
+### Documentation
+
+* **agents:** point to the org AI Usage Policy instead of restating it ([1e8e003](https://github.com/home-operations/yayamlls/commit/1e8e00316bdafb5e1c1df360657837307f8a0fdd))
+* **agents:** update AI usage policy summary ([fae72aa](https://github.com/home-operations/yayamlls/commit/fae72aa28f760b412ad52c576cd26392d395a61f))
+
+
+### Continuous Integration
+
+* **renovate:** remove the dispatch workflow ([33d3b14](https://github.com/home-operations/yayamlls/commit/33d3b14800f3d874bae323086365a675635fa736))
+
+
+### Miscellaneous Chores
+
+* **deps:** bump Go to 1.27.2 and golang.org/x/net to v0.60.0 ([#227](https://github.com/home-operations/yayamlls/issues/227)) ([9226acc](https://github.com/home-operations/yayamlls/commit/9226acc0918ca46513c9ba88e26f834ecd080e28))
+* **github-action:** update action actions/setup-node (v7.0.0 → v7.1.0) ([#230](https://github.com/home-operations/yayamlls/issues/230)) ([8fda540](https://github.com/home-operations/yayamlls/commit/8fda540512c0ba6fcbe1f5d41fb0e86d1fc1d2db))
+* **github-action:** update action jdx/mise-action (v4.3.0 → v5.0.0) ([#214](https://github.com/home-operations/yayamlls/issues/214)) ([08cb76a](https://github.com/home-operations/yayamlls/commit/08cb76addd7c0106300862cc5afa440117566d2c))
+* **github-action:** update action jdx/mise-action (v5.0.1 → v5.1.1) ([#221](https://github.com/home-operations/yayamlls/issues/221)) ([c0524f5](https://github.com/home-operations/yayamlls/commit/c0524f515c0bf62ddd68ab0618ba78aef42174fc))
+* **github-action:** update github-actions ([#217](https://github.com/home-operations/yayamlls/issues/217)) ([5abe421](https://github.com/home-operations/yayamlls/commit/5abe4215bcaacc4dd52a22701ef376498a389885))
+* **github-action:** update github-actions ([#224](https://github.com/home-operations/yayamlls/issues/224)) ([996843e](https://github.com/home-operations/yayamlls/commit/996843e880244193d2a52838f5e50343f0660170))
+* **github-action:** update github-actions ([#233](https://github.com/home-operations/yayamlls/issues/233)) ([1f8bec8](https://github.com/home-operations/yayamlls/commit/1f8bec842d8e6866510c1f09b6475f65ee420f57))
+* **mise:** update mise tools ([#232](https://github.com/home-operations/yayamlls/issues/232)) ([4c5f9a8](https://github.com/home-operations/yayamlls/commit/4c5f9a88328994d6ac9522a60a62a3fcf0f91955))
+* **mise:** update tool golangci-lint (2.13.2 → 2.14.0) ([#210](https://github.com/home-operations/yayamlls/issues/210)) ([760832c](https://github.com/home-operations/yayamlls/commit/760832c82a61fd8a06507d9b7603e896a26c49b1))
+* **mise:** update tool lefthook (2.1.14 → 2.1.15) ([#215](https://github.com/home-operations/yayamlls/issues/215)) ([8813966](https://github.com/home-operations/yayamlls/commit/88139667d8d9e6a0c669c19c9d452874b160619e))
+* **mise:** update tool lefthook (2.1.15 → 2.1.16) ([#218](https://github.com/home-operations/yayamlls/issues/218)) ([cb4036e](https://github.com/home-operations/yayamlls/commit/cb4036e21e3ae623905faa9662b91b9f75b81002))
+* **mise:** update tool lefthook (2.1.16 → 2.1.17) ([#226](https://github.com/home-operations/yayamlls/issues/226)) ([d0b60b4](https://github.com/home-operations/yayamlls/commit/d0b60b48b46afc3a80ba13b8c3b4a28a7269160a))
+* **mise:** update tool lefthook (2.1.17 → 2.2.0) ([#228](https://github.com/home-operations/yayamlls/issues/228)) ([62d37d8](https://github.com/home-operations/yayamlls/commit/62d37d8f6f7ad8e7a92b50e7b847330101f6d50d))
+* **mise:** update tool lefthook (2.2.1 → 2.2.2) ([#236](https://github.com/home-operations/yayamlls/issues/236)) ([db801cb](https://github.com/home-operations/yayamlls/commit/db801cb0032920ba1249181d9c775108174ece9a))
+* **mise:** update tool oxfmt (0.70.0 → 0.71.0) ([#213](https://github.com/home-operations/yayamlls/issues/213)) ([cb07000](https://github.com/home-operations/yayamlls/commit/cb07000e23e8eb8594dc0f20d219dab642c4793c))
+* **mise:** update tool oxfmt (0.71.0 → 0.72.0) ([#229](https://github.com/home-operations/yayamlls/issues/229)) ([18cd48e](https://github.com/home-operations/yayamlls/commit/18cd48eb73643335e1eaacf44c9f455695ae84a0))
+* **mise:** upgrade lockfile to format revision 3 ([4b42997](https://github.com/home-operations/yayamlls/commit/4b42997edbbfa1d7e70719859a456f0be193880d))
+* **oxfmt:** ignore mise lock sidecars ([cbccc62](https://github.com/home-operations/yayamlls/commit/cbccc62a39da6b8d609aa398fff6b281157678f0))
+
 ## [0.3.2](https://github.com/home-operations/yayamlls/compare/0.3.1...0.3.2) (2026-09-25)
 
 
