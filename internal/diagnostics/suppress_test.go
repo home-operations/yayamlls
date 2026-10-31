@@ -75,6 +75,16 @@ func TestParseSuppressions(t *testing.T) {
 			suppressed: map[uint32]bool{0: false, 2: false, 99: false},
 		},
 		{
+			name:       "directive inside a block scalar is data with CRLF line endings",
+			text:       "data:\r\n  script: |\r\n    echo hi\r\n    # yayamlls-disable-file\r\n  other: 1\r\n",
+			suppressed: map[uint32]bool{0: false, 3: false, 4: false, 99: false},
+		},
+		{
+			name:       "directives work with CRLF line endings",
+			text:       "a: 1\r\n# yayamlls-disable-line\r\nb: bad\r\n",
+			suppressed: map[uint32]bool{0: false, 2: true},
+		},
+		{
 			name:       "directive after a block scalar ends is honoured",
 			text:       "a: |\n  text\n# yayamlls-disable-file\n",
 			suppressed: map[uint32]bool{0: true, 99: true},

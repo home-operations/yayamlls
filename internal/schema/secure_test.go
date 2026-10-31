@@ -4,7 +4,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	"github.com/home-operations/yayamlls/internal/uri"
+
+	"golang.org/x/net/http/httpproxy"
 )
 
 // enableLoopbackForTest relaxes the SSRF loopback block so a test can reach an
@@ -234,26 +235,21 @@ func TestIsBlockedIP_Ranges(t *testing.T) {
 }
 
 func TestEnvProxyAddrs(t *testing.T) {
-	mk := func(raw string) func(*http.Request) (*url.URL, error) {
-		return func(*http.Request) (*url.URL, error) {
-			if raw == "" {
-				return nil, nil
-			}
-			return url.Parse(raw)
-		}
-	}
 	tests := []struct {
-		name, proxy string
-		want        []string
+		name string
+		cfg  httpproxy.Config
+		want []string
 	}{
-		{"none", "", nil},
-		{"explicit port", "http://127.0.0.1:3128", []string{"127.0.0.1:3128", "127.0.0.1:3128"}},
-		{"default http port", "http://proxy.corp", []string{"proxy.corp:80", "proxy.corp:80"}},
-		{"socks default", "socks5://10.0.0.1", []string{"10.0.0.1:1080", "10.0.0.1:1080"}},
+		{"none", httpproxy.Config{}, nil},
+		{"explicit port", httpproxy.Config{HTTPSProxy: "http://127.0.0.1:3128"}, []string{"127.0.0.1:3128"}},
+		{"no scheme", httpproxy.Config{HTTPProxy: "127.0.0.1:3128"}, []string{"127.0.0.1:3128"}},
+		{"default http port", httpproxy.Config{HTTPProxy: "http://proxy.corp", HTTPSProxy: "http://proxy.corp"}, []string{"proxy.corp:80", "proxy.corp:80"}},
+		{"socks default", httpproxy.Config{HTTPSProxy: "socks5://10.0.0.1"}, []string{"10.0.0.1:1080"}},
+		{"no_proxy ignored", httpproxy.Config{HTTPSProxy: "http://127.0.0.1:3128", NoProxy: "example.com"}, []string{"127.0.0.1:3128"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := envProxyAddrs(mk(tt.proxy)); !slices.Equal(got, tt.want) {
+			if got := envProxyAddrs(tt.cfg); !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})

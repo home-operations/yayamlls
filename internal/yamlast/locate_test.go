@@ -2,6 +2,7 @@ package yamlast
 
 import (
 	"testing"
+	"time"
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
@@ -123,4 +124,20 @@ func TestLocate_SelfReferentialMergeTerminates(t *testing.T) {
 	src := "a: &a\n  <<: *a\n  k: 1\n"
 	doc := Parse([]byte(src)).Docs()[0]
 	_ = LocateRange(doc, "/a/nope", src)
+}
+
+func TestLocate_RepeatedMergeSourcesStayLinear(t *testing.T) {
+	src := "a: &a {<<: [*a, *a]}\n"
+	doc := Parse([]byte(src)).Docs()[0]
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = LocateRange(doc, "/a/nope", src)
+		_, _ = LocateKey(doc, "/a", "nope", src)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("lookup through repeated merge sources did not finish")
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/net/http/httpproxy"
 )
 
 // safeHTTPClient builds the client used for every schema/catalog fetch. It
@@ -27,7 +28,7 @@ import (
 func safeHTTPClient(timeout time.Duration) *http.Client {
 	tr := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           guardedDialContext(timeout, envProxyAddrs(http.ProxyFromEnvironment)),
+		DialContext:           guardedDialContext(timeout, envProxyAddrs(*httpproxy.FromEnvironment())),
 		TLSHandshakeTimeout:   timeout,
 		ResponseHeaderTimeout: timeout,
 		ForceAttemptHTTP2:     true,
@@ -50,17 +51,18 @@ func guardedDialContext(timeout time.Duration, proxyAddrs []string) dialFunc {
 	}
 }
 
-// envProxyAddrs returns the proxy host:port pairs proxyFn selects for plain
-// http and https targets, in the form net/http dials them (canonicalAddr in
-// net/http/transport.go: the scheme's default port when the URL has none).
-func envProxyAddrs(proxyFn func(*http.Request) (*url.URL, error)) []string {
+// envProxyAddrs returns the configured proxy host:port pairs as net/http dials
+// them. NO_PROXY is cleared: it picks targets, not the proxy's address.
+func envProxyAddrs(cfg httpproxy.Config) []string {
+	cfg.NoProxy = ""
+	proxyFn := cfg.ProxyFunc()
 	var addrs []string
-	for _, target := range []string{"http://example.com", "https://example.com"} {
-		req, err := http.NewRequest(http.MethodGet, target, nil)
+	for _, raw := range []string{"http://example.com", "https://example.com"} {
+		target, err := url.Parse(raw)
 		if err != nil {
 			continue
 		}
-		u, err := proxyFn(req)
+		u, err := proxyFn(target)
 		if err != nil || u == nil {
 			continue
 		}

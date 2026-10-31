@@ -65,7 +65,7 @@ func LocateKey(doc *ast.DocumentNode, parentPtr, key, src string) (protocol.Rang
 	if via == nil {
 		via = dvia
 	}
-	_, kn, kvia, ok := r.field(n, key, 0)
+	_, kn, kvia, ok := r.field(n, key, map[ast.Node]bool{})
 	if !ok {
 		return protocol.Range{}, false
 	}
@@ -100,7 +100,7 @@ type resolver struct {
 	anchors map[string]ast.Node
 }
 
-// maxAliasDepth bounds alias/merge chains so a self-referential anchor
+// maxAliasDepth bounds alias-to-alias chains so a self-referential anchor
 // can't loop forever.
 const maxAliasDepth = 32
 
@@ -160,11 +160,13 @@ func isMergeKey(n ast.Node) bool {
 
 // field finds seg in the mapping n (already dereferenced). Explicit keys win
 // over merged ones; among a merge sequence the earliest source wins, per the
-// YAML merge spec. via is the alias that supplied a merged entry.
-func (r *resolver) field(n ast.Node, seg string, depth int) (val, key, via ast.Node, ok bool) {
-	if depth > maxAliasDepth {
+// YAML merge spec. via is the alias that supplied a merged entry. seen skips
+// mappings already searched, keeping repeated or cyclic merges linear.
+func (r *resolver) field(n ast.Node, seg string, seen map[ast.Node]bool) (val, key, via ast.Node, ok bool) {
+	if n == nil || seen[n] {
 		return nil, nil, nil, false
 	}
+	seen[n] = true
 	entries := entriesOf(n)
 	for _, kv := range entries {
 		if !isMergeKey(kv.Key) && mapKeyString(kv.Key) == seg {
@@ -181,7 +183,7 @@ func (r *resolver) field(n ast.Node, seg string, depth int) (val, key, via ast.N
 		}
 		for _, src := range sources {
 			target, site := r.deref(src)
-			v, k, nested, found := r.field(target, seg, depth+1)
+			v, k, nested, found := r.field(target, seg, seen)
 			if !found {
 				continue
 			}
@@ -232,7 +234,7 @@ func (r *resolver) descend(node ast.Node, seg string) (ast.Node, ast.Node, bool)
 	n, via := r.deref(node)
 	switch n := n.(type) {
 	case *ast.MappingNode, *ast.MappingValueNode:
-		v, _, fvia, ok := r.field(n, seg, 0)
+		v, _, fvia, ok := r.field(n, seg, map[ast.Node]bool{})
 		if via == nil {
 			via = fvia
 		}
