@@ -65,3 +65,44 @@ func TestCompletion_ValuesAtValuePosition(t *testing.T) {
 		t.Errorf("enabled missing booleans: %v", g2)
 	}
 }
+
+func TestCompletion_EnumValuesAreQuotedWhenNeeded(t *testing.T) {
+	sch := compile(t, `{
+		"type": "object",
+		"properties": {"mode": {"enum": ["plain", "true", "1.0", "a: b", "", 7, true]}}
+	}`)
+	tests := []struct {
+		label string
+		want  *string // nil: no explicit InsertText, label inserts as-is
+	}{
+		{"plain", nil},
+		{"true", new(`"true"`)},
+		{"1.0", new(`"1.0"`)},
+		{"a: b", new(`"a: b"`)},
+		{"", new(`""`)},
+	}
+	list := completion.At(yamlast.Parse([]byte("mode: ")), protocol.Position{Line: 0, Character: 6}, sch, completion.Options{})
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			got := itemByLabel(t, list, tt.label).InsertText
+			if (got == nil) != (tt.want == nil) || (got != nil && *got != *tt.want) {
+				t.Errorf("InsertText = %v, want %v", strOrNil(got), strOrNil(tt.want))
+			}
+		})
+	}
+	t.Run("non-string scalars stay bare", func(t *testing.T) {
+		for _, l := range []string{"7", "true"} {
+			for _, it := range list.Items {
+				if it.Label == l && it.InsertText != nil && *it.InsertText != l && *it.InsertText != `"true"` {
+					t.Errorf("label %q inserts %q", l, *it.InsertText)
+				}
+			}
+		}
+	})
+	t.Run("leading space after colon", func(t *testing.T) {
+		l := completion.At(yamlast.Parse([]byte("mode:")), protocol.Position{Line: 0, Character: 5}, sch, completion.Options{})
+		if got := itemByLabel(t, l, "true").InsertText; got == nil || *got != ` "true"` {
+			t.Errorf("InsertText = %v, want ` \"true\"`", strOrNil(got))
+		}
+	})
+}

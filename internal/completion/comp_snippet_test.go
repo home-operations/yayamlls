@@ -178,3 +178,22 @@ func TestCompletion_PropertyAfterBareDashGetsLeadingSpace(t *testing.T) {
 		t.Fatalf("InsertText = %v, want %q", strOrNil(it.InsertText), " name: ")
 	}
 }
+
+func TestCompletion_SnippetEscapesKeysAndRendersDefaults(t *testing.T) {
+	sch := compile(t, `{
+		"type": "object",
+		"properties": {
+			"a$b": {"type": "string"},
+			"obj": {"type": "object", "required": ["x}y"], "properties": {"x}y": {"type": "string"}}},
+			"cfg": {"default": {"a": 1}},
+			"lst": {"default": [1, "two"]},
+			"word": {"type": "string", "default": "yes"}
+		}
+	}`)
+	list := completion.At(yamlast.Parse([]byte("")), protocol.Position{}, sch, snippetOpts())
+	assertSnippet(t, itemByLabel(t, list, "a$b"), `a\$b: $1`)
+	assertSnippet(t, itemByLabel(t, list, "obj"), "obj:\n  x\\}y: $1")
+	assertSnippet(t, itemByLabel(t, list, "cfg"), `cfg: ${1:{"a":1\}}`)
+	assertSnippet(t, itemByLabel(t, list, "lst"), `lst: ${1:[1,"two"]}`)
+	assertSnippet(t, itemByLabel(t, list, "word"), `word: ${1:"yes"}`)
+}

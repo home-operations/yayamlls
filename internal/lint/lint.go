@@ -32,7 +32,7 @@ func Document(
 
 	diags := []protocol.Diagnostic{}
 	if parsed.Err != nil {
-		diags = append(diags, diagnostics.ParseErrorDiagnostic(parsed.Err))
+		diags = append(diags, diagnostics.ParseErrorDiagnostic(parsed.Err, parsed.Text))
 	}
 
 	// Documents are independent, so validate them concurrently; their slow

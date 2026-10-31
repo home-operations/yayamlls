@@ -3,6 +3,7 @@ package lsp
 import (
 	"encoding/json"
 	"path/filepath"
+	"slices"
 
 	"github.com/home-operations/yayamlls/internal/actions"
 	"github.com/home-operations/yayamlls/internal/completion"
@@ -55,13 +56,13 @@ func (s *Server) didSave(ctx *glsp.Context, params *protocol.DidSaveTextDocument
 
 func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
 	uri := params.TextDocument.URI
+	s.docs.Close(uri)
 	s.cancelDebounce(uri)
 	s.forgetPublish(uri)
-	s.clearDiagnostics(ctx, uri)
-	s.docs.Close(uri)
 	s.pipeline.Cancel(uri)
 	s.clearRenderState(uri)
 	s.takePendingShow(uri)
+	s.clearDiagnostics(ctx, uri)
 	removeRenderTemps(uri)
 	return nil
 }
@@ -231,16 +232,30 @@ func (s *Server) scheduleRenderForURI(uri string) {
 }
 
 func (s *Server) didChangeWorkspaceFolders(ctx *glsp.Context, params *protocol.DidChangeWorkspaceFoldersParams) error {
-	added := params.Event.Added
-	if len(added) == 0 {
-		// Only folders were removed: keep the current workspace settings
-		// rather than wiping them (and the override layer with them).
-		return nil
-	}
 	s.settingsMu.Lock()
-	s.workspaceRoot = added[0].URI
+	for _, r := range params.Event.Removed {
+		s.workspaceFolders = slices.DeleteFunc(s.workspaceFolders, func(u string) bool { return u == r.URI })
+	}
+	for _, a := range params.Event.Added {
+		if !slices.Contains(s.workspaceFolders, a.URI) {
+			s.workspaceFolders = append(s.workspaceFolders, a.URI)
+		}
+	}
+	// Keep the current root unless its folder was removed.
+	root := s.workspaceRoot
+	rootRemoved := slices.ContainsFunc(params.Event.Removed, func(f protocol.WorkspaceFolder) bool { return f.URI == root })
+	if rootRemoved || root == "" {
+		root = ""
+		if len(s.workspaceFolders) > 0 {
+			root = s.workspaceFolders[0]
+		}
+	}
+	changed := root != s.workspaceRoot
+	s.workspaceRoot = root
 	s.settingsMu.Unlock()
-	s.reloadWorkspaceConfig(ctx)
+	if changed {
+		s.reloadWorkspaceConfig(ctx)
+	}
 	return nil
 }
 

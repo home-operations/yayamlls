@@ -1,6 +1,7 @@
 package diagnostics_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -65,5 +66,29 @@ func TestValidateDoc_AdditionalPropertyAnchorsOnOffendingKey(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("no diagnostic mentioned the unknown property; got %v", diags)
+	}
+}
+
+// A value supplied by a `<<: *anchor` merge or an alias must anchor on the
+// referencing line, not fall back to the whole document.
+func TestValidateDoc_MergedAndAliasedValuesAnchorOnReference(t *testing.T) {
+	sch := compileInlineSchema(t, `{
+		"type": "object",
+		"properties": {
+			"svc": {"type": "object", "properties": {"port": {"type": "string"}}},
+			"al": {"type": "object", "properties": {"port": {"type": "string"}}}
+		}
+	}`)
+	body := "base: &b\n  port: 80\nsvc:\n  <<: *b\n  name: x\nal: *b\n"
+	doc := yamlast.Parse([]byte(body)).Docs()[0]
+
+	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{})
+	lines := make([]uint32, 0, len(diags))
+	for _, d := range diags {
+		lines = append(lines, d.Range.Start.Line)
+	}
+	slices.Sort(lines)
+	if len(lines) != 2 || lines[0] != 3 || lines[1] != 5 {
+		t.Errorf("diagnostic start lines = %v, want [3 5]", lines)
 	}
 }

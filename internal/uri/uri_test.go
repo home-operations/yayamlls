@@ -1,6 +1,10 @@
 package uri
 
-import "testing"
+import (
+	"path/filepath"
+	"runtime"
+	"testing"
+)
 
 func TestFromPath_UnixRoundTrip(t *testing.T) {
 	p := "/home/x/schemas/app.json"
@@ -39,5 +43,19 @@ func TestToPath_UnencodedHashAndQuery(t *testing.T) {
 		if got := ToPath(in); got != want {
 			t.Errorf("ToPath(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestToPath_RemoteHost(t *testing.T) {
+	got := ToPath("file://server/share/x.yaml")
+	want := ""
+	if runtime.GOOS == "windows" {
+		want = `\\server\share\x.yaml`
+	}
+	if got != want {
+		t.Errorf("ToPath = %q, want %q", got, want)
+	}
+	if got := ToPath("file://localhost/a/b.yaml"); got != filepath.FromSlash("/a/b.yaml") {
+		t.Errorf("localhost host = %q", got)
 	}
 }

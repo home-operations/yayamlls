@@ -27,6 +27,36 @@ import (
 // still running is killed.
 const subprocessWaitDelay = 2 * time.Second
 
+const (
+	maxStdoutBytes = 64 << 20
+	maxStderrBytes = 1 << 20
+)
+
+var errOutputTooLarge = errors.New("output too large")
+
+// capWriter buffers up to max bytes. Past that, Write calls onOver and fails,
+// or discards the excess when onOver is nil.
+type capWriter struct {
+	buf    bytes.Buffer
+	max    int
+	over   bool
+	onOver func()
+}
+
+func (w *capWriter) Write(p []byte) (int, error) {
+	room := w.max - w.buf.Len()
+	if len(p) <= room {
+		return w.buf.Write(p)
+	}
+	w.buf.Write(p[:room])
+	w.over = true
+	if w.onOver == nil {
+		return len(p), nil
+	}
+	w.onOver()
+	return room, errOutputTooLarge
+}
+
 // Config is the `renderers:` entry shape for a subprocess renderer.
 //
 //	renderers:
@@ -106,13 +136,20 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 	if args == nil {
 		return &render.RenderedOutput{Provider: r.name}, nil
 	}
+	// Resolve a relative command against the directory it runs in.
+	if doc.Path != "" && !filepath.IsAbs(args[0]) && strings.ContainsRune(args[0], filepath.Separator) {
+		args[0] = filepath.Join(filepath.Dir(doc.Path), args[0])
+	}
 	bin, err := exec.LookPath(args[0])
 	if err != nil {
 		return &render.RenderedOutput{Provider: r.name}, fmt.Errorf(
 			"%w: %q not found on PATH", render.ErrRendererUnavailable, args[0])
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, args[1:]...)
+	isolateProcessGroup(cmd)
 	// Force-close the pipes if cancellation happens but grandchildren still
 	// hold them, so cmd.Wait doesn't keep this goroutine (and the render
 	// FDs) alive past the render timeout.
@@ -120,25 +157,28 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 	if doc.Path != "" {
 		cmd.Dir = filepath.Dir(doc.Path)
 	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	stdout := &capWriter{max: maxStdoutBytes, onOver: cancel}
+	stderr := &capWriter{max: maxStderrBytes}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	runErr := cmd.Run()
 	out := &render.RenderedOutput{
 		Provider: r.name,
-		Raw:      append([]byte(nil), stdout.Bytes()...),
-		Stderr:   append([]byte(nil), stderr.Bytes()...),
+		Raw:      append([]byte(nil), stdout.buf.Bytes()...),
+		Stderr:   append([]byte(nil), stderr.buf.Bytes()...),
 	}
-	// ErrWaitDelay is a soft signal that pipes were force-closed after
-	// cancellation: report the cancellation context to the caller rather
-	// than the OS-level "I/O was interrupted" error.
+	if stdout.over {
+		return out, fmt.Errorf("%s: %w: stdout exceeds %d bytes", r.name, errOutputTooLarge, stdout.max)
+	}
+	// A cancelled or timed-out run surfaces as "signal: killed" or ErrWaitDelay;
+	// report the context error so it isn't mistaken for a tool failure.
 	if runErr != nil {
-		if errors.Is(runErr, exec.ErrWaitDelay) && ctx.Err() != nil {
+		if ctx.Err() != nil {
 			return out, ctx.Err()
 		}
-		return out, fmt.Errorf("%s: %w (stderr: %s)", r.name, runErr, truncate(stderr.String(), 512))
+		return out, fmt.Errorf("%s: %w (stderr: %s)", r.name, runErr, truncate(stderr.buf.String(), 512))
 	}
-	manifests, err := render.ParseManifests(stdout.Bytes())
+	manifests, err := render.ParseManifests(stdout.buf.Bytes())
 	if err != nil {
 		return out, fmt.Errorf("%s: parse output: %w", r.name, err)
 	}

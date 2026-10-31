@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -168,4 +169,72 @@ func TestRun_NoArgsExitsTwo(t *testing.T) {
 	if !strings.Contains(errb.String(), "usage:") {
 		t.Errorf("expected usage message, got: %q", errb.String())
 	}
+}
+
+const badDoc = "# yaml-language-server: $schema=./person.json\nname: Alice\nage: \"thirty\"\n"
+
+func TestRun_DirectoryWalkSkipsVCSAndDependencyDirs(t *testing.T) {
+	root := setupWorkspace(t)
+	for _, d := range []string{".git", "node_modules"} {
+		if err := os.MkdirAll(filepath.Join(root, "sub", d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, filepath.Join(root, "sub", d, "bad.yaml"), badDoc)
+	}
+
+	code, stdout, stderr := run(t, root, root)
+	if code != 0 || stdout != "" {
+		t.Errorf("walk should skip .git/node_modules: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// An explicitly passed directory is never skipped.
+	code, stdout, _ = run(t, root, filepath.Join(root, "sub", "node_modules"))
+	if !strings.Contains(stdout, "bad.yaml") {
+		t.Errorf("explicit node_modules arg: code=%d stdout=%q", code, stdout)
+	}
+}
+
+func TestRun_DedupesFilesPreservingOrder(t *testing.T) {
+	root := setupWorkspace(t)
+	mustWrite(t, filepath.Join(root, "bad.yaml"), badDoc)
+
+	file := filepath.Join(root, "bad.yaml")
+	_, stdout, _ := run(t, root, file, root, filepath.Join(root, ".", "bad.yaml"))
+	if n := strings.Count(stdout, "bad.yaml:"); n != 1 {
+		t.Errorf("expected bad.yaml reported once, got %d:\n%s", n, stdout)
+	}
+	if !strings.HasPrefix(stdout, file+":") {
+		t.Errorf("expected the first-seen original path, got %q", stdout)
+	}
+}
+
+func TestRun_UnreadableDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod 000 is not enforced here")
+	}
+	root := setupWorkspace(t)
+	mustWrite(t, filepath.Join(root, "bad.yaml"), badDoc)
+	locked := filepath.Join(root, "locked")
+	if err := os.Mkdir(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	t.Run("nested directory warns and continues", func(t *testing.T) {
+		code, stdout, stderr := run(t, root, root)
+		if code != 1 || !strings.Contains(stdout, "bad.yaml") {
+			t.Errorf("walk should continue past locked dir: code=%d stdout=%q", code, stdout)
+		}
+		if !strings.Contains(stderr, "warning") || !strings.Contains(stderr, "locked") {
+			t.Errorf("expected warning naming locked dir, got %q", stderr)
+		}
+	})
+	t.Run("explicit argument exits 2", func(t *testing.T) {
+		if code, _, _ := run(t, root, locked); code != 2 {
+			t.Errorf("exit code = %d, want 2", code)
+		}
+	})
 }

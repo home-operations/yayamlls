@@ -2,6 +2,9 @@ package render_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -176,4 +179,76 @@ func (s *slowRenderer) Render(ctx context.Context, _ *render.SourceDocument) (*r
 		return nil, ctx.Err()
 	}
 	return &render.RenderedOutput{Provider: s.Name(), Raw: s.out}, nil
+}
+
+func TestPipeline_ContextErrorsNotCached(t *testing.T) {
+	cases := []struct {
+		name      string
+		err       error
+		wantCalls int
+	}{
+		{"deadline exceeded", fmt.Errorf("fake: %w", context.DeadlineExceeded), 2},
+		{"canceled", context.Canceled, 2},
+		{"deterministic failure", errors.New("bad chart"), 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			reg := render.NewRegistry()
+			fr := &fakeRenderer{name: "fake", matches: true, err: c.err}
+			reg.Register(fr)
+			sink := newRecordingSink()
+			p := render.NewPipeline(reg, sink)
+			p.SetDebounce(time.Millisecond)
+
+			doc := &render.SourceDocument{URI: "file:///tmp/x.yaml", Text: "a"}
+			for range 2 {
+				p.Schedule(doc)
+				select {
+				case <-sink.done:
+				case <-time.After(2 * time.Second):
+					t.Fatal("render never delivered")
+				}
+			}
+			fr.mu.Lock()
+			defer fr.mu.Unlock()
+			if fr.calls != c.wantCalls {
+				t.Errorf("render calls = %d, want %d", fr.calls, c.wantCalls)
+			}
+		})
+	}
+}
+
+// Meant for -race: setters run concurrently with Schedule.
+func TestPipeline_ScheduleConcurrentWithSetters(t *testing.T) {
+	reg := render.NewRegistry()
+	reg.Register(&fakeRenderer{name: "fake", matches: true, out: []byte("apiVersion: v1\nkind: Pod\nmetadata:\n  name: x\n")})
+	sink := newRecordingSink()
+	p := render.NewPipeline(reg, sink)
+	p.SetDebounce(0)
+
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for range 50 {
+				p.SetDebounce(0)
+				p.SetTimeout(time.Second)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := range 50 {
+				p.Schedule(&render.SourceDocument{URI: "file:///tmp/x.yaml", Text: fmt.Sprintf("%d-%d", i, j)})
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Nothing supersedes the last Schedule, so it must deliver.
+	select {
+	case <-sink.done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no render delivered")
+	}
 }

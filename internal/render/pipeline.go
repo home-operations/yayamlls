@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"sync"
 	"time"
 )
@@ -101,14 +102,10 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 		p.sink.Notify(doc.URI, hit.out, hit.err)
 		return
 	}
-	// Capture the inputs the AfterFunc needs under the lock, then release it
-	// before calling time.AfterFunc: sync.Mutex is non-reentrant, and the
-	// AfterFunc body takes the same lock for its writeback. p.epoch is read
-	// here so a concurrent InvalidateAll (also under p.mu) is observed.
-	epoch := p.epoch
-	p.mu.Unlock()
+	// Hold p.mu while arming: the callback takes it too, so it can't see pending
+	// before self is registered.
 	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	self := &pending{cancel: cancel, epoch: epoch}
+	self := &pending{cancel: cancel, epoch: p.epoch}
 	self.timer = time.AfterFunc(p.debounce, func() {
 		defer cancel()
 		out, err := r.Render(ctx, doc)
@@ -120,14 +117,20 @@ func (p *Pipeline) Schedule(doc *SourceDocument) {
 			p.mu.Unlock()
 			return
 		}
-		p.cache[doc.URI] = cacheEntry{hash: hash, out: out, err: err}
+		// Don't cache a cancelled or timed-out render: it says nothing about the text.
+		if !isContextErr(err) {
+			p.cache[doc.URI] = cacheEntry{hash: hash, out: out, err: err}
+		}
 		delete(p.pending, doc.URI)
 		p.mu.Unlock()
 		p.sink.Notify(doc.URI, out, err)
 	})
-	p.mu.Lock()
 	p.pending[doc.URI] = self
 	p.mu.Unlock()
+}
+
+func isContextErr(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func (p *Pipeline) Latest(uri, text string) (*RenderedOutput, bool) {

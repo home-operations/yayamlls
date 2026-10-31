@@ -56,62 +56,171 @@ func TagAt(doc *ast.DocumentNode, ptr string) (string, bool) {
 // property) on a specific key line rather than the whole mapping. key is a
 // raw key, already unescaped. ok is false when the mapping or key isn't found.
 func LocateKey(doc *ast.DocumentNode, parentPtr, key, src string) (protocol.Range, bool) {
-	parent, ok := lookup(doc, parentPtr)
+	r := &resolver{doc: doc}
+	parent, via, ok := r.lookup(parentPtr)
 	if !ok {
 		return protocol.Range{}, false
 	}
-	kn := keyNode(parent, key)
-	if kn == nil {
+	n, dvia := r.deref(parent)
+	if via == nil {
+		via = dvia
+	}
+	_, kn, kvia, ok := r.field(n, key, 0)
+	if !ok {
 		return protocol.Range{}, false
+	}
+	if via == nil {
+		via = kvia
+	}
+	if via != nil {
+		return nodeRange(src, via), true
 	}
 	return nodeRange(src, kn), true
 }
 
-func keyNode(parent ast.Node, key string) ast.Node {
-	switch n := parent.(type) {
-	case *ast.MappingNode:
-		for _, kv := range n.Values {
-			if mapKeyString(kv.Key) == key {
-				return kv.Key
-			}
-		}
-	case *ast.MappingValueNode:
-		if mapKeyString(n.Key) == key {
-			return n.Key
-		}
-	}
-	return nil
-}
-
-// LocateRange returns the LSP range that covers the node at ptr. src is the
-// document text, needed to translate goccy's rune-based columns into the
-// UTF-16 code units LSP uses. Falls back to the document body's range when
-// ptr can't be resolved, common for `required` violations where the field
-// is simply missing.
+// LocateRange returns the LSP range of the node at ptr; src converts goccy's
+// rune columns to UTF-16. An unresolved ptr anchors on its deepest resolvable
+// ancestor. A value behind an alias or `<<` merge anchors on the alias: the
+// line the user can edit or suppress.
 func LocateRange(doc *ast.DocumentNode, ptr, src string) protocol.Range {
-	node, ok := lookup(doc, ptr)
-	if !ok {
+	node, via, _ := (&resolver{doc: doc}).lookup(ptr)
+	if via != nil {
+		node = via
+	}
+	if node == nil && doc != nil {
 		node = doc.Body
 	}
 	return nodeRange(src, node)
 }
 
-func lookup(doc *ast.DocumentNode, ptr string) (ast.Node, bool) {
-	if doc == nil || doc.Body == nil {
-		return nil, false
+// resolver follows anchors, aliases and merge keys. The anchor table is built
+// on first use since most documents have no aliases.
+type resolver struct {
+	doc     *ast.DocumentNode
+	anchors map[string]ast.Node
+}
+
+// maxAliasDepth bounds alias/merge chains so a self-referential anchor
+// can't loop forever.
+const maxAliasDepth = 32
+
+type anchorCollector map[string]ast.Node
+
+func (c anchorCollector) Visit(n ast.Node) ast.Visitor {
+	if a, ok := n.(*ast.AnchorNode); ok && a.Name != nil {
+		c[mapKeyString(a.Name)] = a.Value
 	}
+	return c
+}
+
+func (r *resolver) anchor(name string) ast.Node {
+	if r.anchors == nil {
+		r.anchors = map[string]ast.Node{}
+		ast.Walk(anchorCollector(r.anchors), r.doc)
+	}
+	return r.anchors[name]
+}
+
+// deref unwraps anchor definitions and follows aliases to their anchor's
+// value. via is the first alias crossed, nil when none was.
+func (r *resolver) deref(n ast.Node) (out ast.Node, via ast.Node) {
+	for range maxAliasDepth {
+		switch x := n.(type) {
+		case *ast.AnchorNode:
+			n = x.Value
+		case *ast.AliasNode:
+			if via == nil {
+				via = x
+			}
+			n = r.anchor(mapKeyString(x.Value))
+			if n == nil {
+				return nil, via
+			}
+		default:
+			return n, via
+		}
+	}
+	return nil, via
+}
+
+func entriesOf(n ast.Node) []*ast.MappingValueNode {
+	switch n := n.(type) {
+	case *ast.MappingNode:
+		return n.Values
+	case *ast.MappingValueNode:
+		return []*ast.MappingValueNode{n}
+	}
+	return nil
+}
+
+func isMergeKey(n ast.Node) bool {
+	_, ok := n.(*ast.MergeKeyNode)
+	return ok
+}
+
+// field finds seg in the mapping n (already dereferenced). Explicit keys win
+// over merged ones; among a merge sequence the earliest source wins, per the
+// YAML merge spec. via is the alias that supplied a merged entry.
+func (r *resolver) field(n ast.Node, seg string, depth int) (val, key, via ast.Node, ok bool) {
+	if depth > maxAliasDepth {
+		return nil, nil, nil, false
+	}
+	entries := entriesOf(n)
+	for _, kv := range entries {
+		if !isMergeKey(kv.Key) && mapKeyString(kv.Key) == seg {
+			return kv.Value, kv.Key, nil, true
+		}
+	}
+	for _, kv := range entries {
+		if !isMergeKey(kv.Key) {
+			continue
+		}
+		sources := []ast.Node{kv.Value}
+		if seq, isSeq := kv.Value.(*ast.SequenceNode); isSeq {
+			sources = seq.Values
+		}
+		for _, src := range sources {
+			target, site := r.deref(src)
+			v, k, nested, found := r.field(target, seg, depth+1)
+			if !found {
+				continue
+			}
+			if site != nil {
+				nested = site
+			}
+			return v, k, nested, true
+		}
+	}
+	return nil, nil, nil, false
+}
+
+// lookup resolves ptr. ok is false when a segment is missing; node (and via)
+// then describe the deepest ancestor that did resolve. via is the first alias
+// crossed on the way, nil when the path stays in literal nodes.
+func (r *resolver) lookup(ptr string) (node, via ast.Node, ok bool) {
+	if r.doc == nil || r.doc.Body == nil {
+		return nil, nil, false
+	}
+	node = r.doc.Body
 	if ptr == "" || ptr == "/" {
-		return doc.Body, true
+		return node, nil, true
 	}
-	node := doc.Body
 	for raw := range strings.SplitSeq(strings.TrimPrefix(ptr, "/"), "/") {
-		next, ok := descend(node, unescapePointerSegment(raw))
-		if !ok {
-			return nil, false
+		next, nvia, found := r.descend(node, unescapePointerSegment(raw))
+		if !found {
+			return node, via, false
 		}
 		node = next
+		if via == nil {
+			via = nvia
+		}
 	}
-	return node, true
+	return node, via, true
+}
+
+func lookup(doc *ast.DocumentNode, ptr string) (ast.Node, bool) {
+	node, _, ok := (&resolver{doc: doc}).lookup(ptr)
+	return node, ok
 }
 
 // descend resolves one JSON-Pointer segment against a YAML node. The node
@@ -119,24 +228,21 @@ func lookup(doc *ast.DocumentNode, ptr string) (ast.Node, bool) {
 // exact string and against sequence elements by index. This is why a
 // numeric-looking mapping key (e.g. a port number) or a key containing '.'
 // or '/' resolves correctly, where a YAMLPath round-trip would mis-parse it.
-func descend(node ast.Node, seg string) (ast.Node, bool) {
-	switch n := node.(type) {
-	case *ast.MappingNode:
-		for _, kv := range n.Values {
-			if mapKeyString(kv.Key) == seg {
-				return kv.Value, true
-			}
+func (r *resolver) descend(node ast.Node, seg string) (ast.Node, ast.Node, bool) {
+	n, via := r.deref(node)
+	switch n := n.(type) {
+	case *ast.MappingNode, *ast.MappingValueNode:
+		v, _, fvia, ok := r.field(n, seg, 0)
+		if via == nil {
+			via = fvia
 		}
-	case *ast.MappingValueNode:
-		if mapKeyString(n.Key) == seg {
-			return n.Value, true
-		}
+		return v, via, ok
 	case *ast.SequenceNode:
 		if i, err := strconv.Atoi(seg); err == nil && i >= 0 && i < len(n.Values) {
-			return n.Values[i], true
+			return n.Values[i], via, true
 		}
 	}
-	return nil, false
+	return nil, nil, false
 }
 
 func mapKeyString(n ast.Node) string {

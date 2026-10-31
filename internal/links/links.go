@@ -4,6 +4,7 @@ package links
 import (
 	"strings"
 
+	"github.com/home-operations/yayamlls/internal/yamlast"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -17,25 +18,22 @@ func Links(text string) []protocol.DocumentLink {
 		if !strings.HasPrefix(trimmed, modelinePrefix) {
 			continue
 		}
-		rest := trimmed[len(modelinePrefix):]
-		for kv := range strings.FieldsSeq(rest) {
+		restStart := len(line) - len(trimmed) + len(modelinePrefix)
+		cursor := restStart
+		for kv := range strings.FieldsSeq(line[restStart:]) {
+			cursor += strings.Index(line[cursor:], kv)
+			kvStart := cursor
+			cursor += len(kv)
 			k, v, ok := strings.Cut(kv, "=")
-			if !ok || strings.TrimSpace(k) != "$schema" {
+			if !ok || strings.TrimSpace(k) != "$schema" || !isHTTPURL(v) {
 				continue
 			}
-			url := strings.TrimSpace(v)
-			if !isHTTPURL(url) {
-				continue
-			}
-			startCol := strings.Index(line, url)
-			if startCol < 0 {
-				continue
-			}
-			target := url
+			startCol := yamlast.UTF16Len(line[:kvStart+len(k)+1])
+			target := v
 			out = append(out, protocol.DocumentLink{
 				Range: protocol.Range{
-					Start: protocol.Position{Line: uint32(i), Character: uint32(startCol)},
-					End:   protocol.Position{Line: uint32(i), Character: uint32(startCol + len(url))},
+					Start: protocol.Position{Line: uint32(i), Character: startCol},
+					End:   protocol.Position{Line: uint32(i), Character: startCol + yamlast.UTF16Len(v)},
 				},
 				Target: &target,
 			})

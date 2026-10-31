@@ -145,7 +145,7 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 	var docs []map[string]any
 	var failures []string
 	for _, id := range tree.byKind[kind] {
-		if id.Name != doc.Name {
+		if id.Name != doc.Name || !namespaceMatches(doc.Namespace, id.Namespace) {
 			continue
 		}
 		matched++
@@ -165,7 +165,7 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 	if matched == 0 {
 		// A name that matches nothing in the tree should error rather than
 		// silently render empty — a typo shouldn't look like a clean build.
-		return out, fmt.Errorf("flate: no %s named %q under %s", kind, doc.Name, root)
+		return out, fmt.Errorf("flate: no %s named %q%s under %s", kind, doc.Name, inNamespace(doc.Namespace), root)
 	}
 	if len(docs) > 0 {
 		raw, err := marshalDocs(docs)
@@ -184,6 +184,19 @@ func (r *Renderer) Render(ctx context.Context, doc *render.SourceDocument) (*ren
 		return out, fmt.Errorf("flate: %s", strings.Join(failures, "; "))
 	}
 	return out, nil
+}
+
+// namespaceMatches treats an empty namespace on either side as a wildcard:
+// Flux fills a missing one from the parent Kustomization's targetNamespace.
+func namespaceMatches(docNS, idNS string) bool {
+	return docNS == "" || idNS == "" || docNS == idNS
+}
+
+func inNamespace(ns string) string {
+	if ns == "" {
+		return ""
+	}
+	return fmt.Sprintf(" in namespace %q", ns)
 }
 
 // treeRender is one whole-tree orchestrator run, shared by every document
@@ -220,6 +233,11 @@ func (r *Renderer) tree(ctx context.Context, root string) (*treeRender, error) {
 	defer r.treeMu.Unlock()
 	if c := r.cached; c != nil && c.root == root && c.fingerprint == fp && c.gen == gen {
 		return c, c.err
+	}
+	// A waiter whose context expired while blocked must not build or
+	// negative-cache its own deadline.
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	t := buildTree(ctx, root)
 	// Never cache an interrupted render: a Run-phase cancellation still

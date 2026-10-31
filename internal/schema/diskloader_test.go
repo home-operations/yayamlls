@@ -58,7 +58,7 @@ func TestDiskCachedLoad_ServesFromCacheAfterFirstHit(t *testing.T) {
 		t.Errorf("expected 1 origin hit (fresh cache, no revalidation), got %d", hits)
 	}
 
-	bodyPath, metaPath := pathsFor(url)
+	bodyPath, metaPath := loader.pathsFor(url)
 	if _, err := os.Stat(bodyPath); err != nil {
 		t.Errorf("body cache missing: %v", err)
 	}

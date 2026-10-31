@@ -150,3 +150,38 @@ func TestSuppressActionCRLF(t *testing.T) {
 		t.Errorf("CRLF edit position %+v, want before CR at char %d", e.Range.Start, len("  foo: bar"))
 	}
 }
+
+func TestEnumQuickFix_QuotesStringsThatWouldChangeType(t *testing.T) {
+	const schemaJSON = `{
+	  "type": "object",
+	  "properties": {"v": {"enum": ["ok", "true", "null", "1.0", "yes", "a: b", "#x", "", 3, false]}}
+	}`
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader([]byte(schemaJSON)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft2020)
+	if err := c.AddResource("mem://schema.json", doc); err != nil {
+		t.Fatal(err)
+	}
+	sch, err := c.Compile("mem://schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	diag := protocol.Diagnostic{
+		Data: diagnostics.CauseData{Kind: "enum", InstanceLocation: "/v"},
+	}
+	const uri = "file:///x.yaml"
+	got := actions.Compute(uri, "v: bad\n", sch, []protocol.Diagnostic{diag})
+
+	want := []string{"ok", `"true"`, `"null"`, `"1.0"`, `"yes"`, `"a: b"`, `"#x"`, `""`, "3", "false"}
+	if len(got) != len(want) {
+		t.Fatalf("got %d actions, want %d", len(got), len(want))
+	}
+	for i, w := range want {
+		if text := got[i].Edit.Changes[uri][0].NewText; text != w {
+			t.Errorf("action %d NewText = %s, want %s", i, text, w)
+		}
+	}
+}

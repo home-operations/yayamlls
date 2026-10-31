@@ -44,6 +44,46 @@ func TestParseSuppressions(t *testing.T) {
 			text:       "a: 1  # just a note\nb: 2\n",
 			suppressed: map[uint32]bool{0: false, 1: false},
 		},
+		{
+			name:       "directive inside a double-quoted scalar is data",
+			text:       "data: \"x # yayamlls-disable-file\"\nb: 2\n",
+			suppressed: map[uint32]bool{0: false, 1: false, 99: false},
+		},
+		{
+			name:       "directive inside a single-quoted scalar is data",
+			text:       "data: 'x # yayamlls-disable-file'\nb: 2\n",
+			suppressed: map[uint32]bool{0: false, 1: false, 99: false},
+		},
+		{
+			name:       "comment after a quoted scalar still counts",
+			text:       "data: \"a # b\" # yayamlls-disable-line\nb: 2\n",
+			suppressed: map[uint32]bool{0: true, 1: false},
+		},
+		{
+			name:       "apostrophe in a plain scalar does not hide the comment",
+			text:       "msg: it's # yayamlls-disable-line\nb: 2\n",
+			suppressed: map[uint32]bool{0: true, 1: false},
+		},
+		{
+			name:       "directive inside a literal block scalar is data",
+			text:       "data:\n  script: |\n    echo hi\n    # yayamlls-disable-file\n  other: 1\n",
+			suppressed: map[uint32]bool{0: false, 3: false, 4: false, 99: false},
+		},
+		{
+			name:       "directive inside a folded block scalar under a sequence is data",
+			text:       "items:\n  - run: >-\n      # yayamlls-disable-file\n\n      more\n",
+			suppressed: map[uint32]bool{0: false, 2: false, 99: false},
+		},
+		{
+			name:       "directive after a block scalar ends is honoured",
+			text:       "a: |\n  text\n# yayamlls-disable-file\n",
+			suppressed: map[uint32]bool{0: true, 99: true},
+		},
+		{
+			name:       "comment on the block header line is honoured",
+			text:       "a: | # yayamlls-disable-line\n  text\nb: 1\n",
+			suppressed: map[uint32]bool{0: true, 1: false, 2: false},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

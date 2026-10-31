@@ -34,7 +34,7 @@ func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema, opts Options) []pr
 	}
 	var out []protocol.Diagnostic
 	if parsed.Err != nil {
-		out = append(out, parseErrorDiag(parsed.Err))
+		out = append(out, parseErrorDiag(parsed.Err, parsed.Text))
 	}
 	if sch == nil {
 		return out
@@ -58,8 +58,8 @@ func ValidateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string, opts
 // ParseErrorDiagnostic produces the file-level diagnostic for a YAML
 // parse failure. Exposed so the LSP layer can surface it once per file
 // rather than once per doc.
-func ParseErrorDiagnostic(err error) protocol.Diagnostic {
-	return parseErrorDiag(err)
+func ParseErrorDiagnostic(err error, src string) protocol.Diagnostic {
+	return parseErrorDiag(err, src)
 }
 
 func validateDoc(doc *ast.DocumentNode, sch *jsonschema.Schema, src string, opts Options) []protocol.Diagnostic {
@@ -376,8 +376,8 @@ func displayPointer(p string) string {
 	return p
 }
 
-func parseErrorDiag(err error) protocol.Diagnostic {
-	rng, msg := parseErrorLocation(err.Error())
+func parseErrorDiag(err error, src string) protocol.Diagnostic {
+	rng, msg := parseErrorLocation(err.Error(), src)
 	return protocol.Diagnostic{
 		Severity: new(protocol.DiagnosticSeverityError),
 		Source:   new(Source),
@@ -390,7 +390,7 @@ func parseErrorDiag(err error) protocol.Diagnostic {
 // which is formatted as "[line:col] message" followed by a source snippet.
 // The snippet is dropped and the position anchors the diagnostic; if the
 // prefix is absent the message is returned as-is at the document start.
-func parseErrorLocation(s string) (protocol.Range, string) {
+func parseErrorLocation(s, src string) (protocol.Range, string) {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		s = s[:i]
 	}
@@ -405,7 +405,7 @@ func parseErrorLocation(s string) (protocol.Range, string) {
 	if !ok {
 		return protocol.Range{}, s
 	}
-	pos := protocol.Position{Line: oneBasedToZero(line), Character: oneBasedToZero(col)}
+	pos := yamlast.UTF16Position(src, line, col)
 	rng := protocol.Range{Start: pos, End: protocol.Position{Line: pos.Line, Character: pos.Character + 1}}
 	return rng, strings.TrimSpace(s[close+1:])
 }
@@ -418,11 +418,4 @@ func splitLineCol(s string) (line, col int, ok bool) {
 	line, err1 := strconv.Atoi(before)
 	col, err2 := strconv.Atoi(after)
 	return line, col, err1 == nil && err2 == nil
-}
-
-func oneBasedToZero(n int) uint32 {
-	if n > 0 {
-		return uint32(n - 1)
-	}
-	return 0
 }

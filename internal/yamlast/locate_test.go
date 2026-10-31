@@ -78,3 +78,49 @@ func TestUTF16Len_CountsCodeUnits(t *testing.T) {
 		t.Errorf("UTF16Len = %d, want 4", got)
 	}
 }
+
+func TestLocate_AliasesAndMerges(t *testing.T) {
+	src := "base: &b\n  port: 80\nsvc:\n  <<: *b\n  name: x\nal: *b\nseq:\n  <<: [*b]\nown:\n  <<: *b\n  port: 1\n"
+	doc := Parse([]byte(src)).Docs()[0]
+
+	tests := []struct {
+		name string
+		ptr  string
+		line uint32
+	}{
+		{"through anchor definition", "/base/port", 1},
+		{"merged key points at merge alias", "/svc/port", 3},
+		{"explicit key beats merge", "/svc/name", 4},
+		{"merge from sequence of aliases", "/seq/port", 7},
+		{"alias value descent points at alias", "/al/port", 5},
+		{"explicit key shadows merge", "/own/port", 10},
+		{"missing leaf anchors on deepest ancestor", "/svc/missing", 3},
+		{"missing under plain mapping anchors on parent", "/own/missing/deeper", 9},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LocateRange(doc, tt.ptr, src).Start.Line; got != tt.line {
+				t.Errorf("LocateRange(%q) line = %d, want %d", tt.ptr, got, tt.line)
+			}
+		})
+	}
+
+	t.Run("LocateKey on merged key", func(t *testing.T) {
+		r, ok := LocateKey(doc, "/svc", "port", src)
+		if !ok || r.Start.Line != 3 {
+			t.Errorf("LocateKey = %v, %v; want line 3", r, ok)
+		}
+	})
+	t.Run("LocateKey explicit key", func(t *testing.T) {
+		r, ok := LocateKey(doc, "/svc", "name", src)
+		if !ok || r.Start.Line != 4 {
+			t.Errorf("LocateKey = %v, %v; want line 4", r, ok)
+		}
+	})
+}
+
+func TestLocate_SelfReferentialMergeTerminates(t *testing.T) {
+	src := "a: &a\n  <<: *a\n  k: 1\n"
+	doc := Parse([]byte(src)).Docs()[0]
+	_ = LocateRange(doc, "/a/nope", src)
+}

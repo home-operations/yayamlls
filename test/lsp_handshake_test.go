@@ -127,9 +127,11 @@ func TestInitializeHandshake(t *testing.T) {
 	conn := &rpcConn{w: stdin, r: bufio.NewReader(stdout)}
 
 	initParams := map[string]any{
-		"processId":    nil,
-		"rootUri":      nil,
-		"capabilities": map[string]any{},
+		"processId": nil,
+		"rootUri":   nil,
+		"capabilities": map[string]any{
+			"workspace": map[string]any{"workspaceFolders": true},
+		},
 	}
 	if _, err := conn.send("initialize", initParams); err != nil {
 		t.Fatalf("send initialize: %v", err)
@@ -163,4 +165,11 @@ func TestInitializeHandshake(t *testing.T) {
 	if !ok || info["name"] != "yayamlls" {
 		t.Errorf("serverInfo missing or wrong: %v", result["serverInfo"])
 	}
+}
+
+// fixturesRootURI is the workspace root for tests whose fixtures reference
+// file:// schemas: the server only loads those from inside the workspace.
+func fixturesRootURI() string {
+	_, thisFile, _, _ := runtime.Caller(0)
+	return "file://" + filepath.Join(filepath.Dir(thisFile), "fixtures")
 }

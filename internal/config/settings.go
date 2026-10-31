@@ -20,6 +20,11 @@ type Settings struct {
 	// CustomTags lists YAML tags (e.g. "!Ref", "!vault scalar") whose values
 	// an external tool resolves; nodes carrying them skip schema validation.
 	CustomTags []string `json:"customTags,omitempty"`
+	// TrustedSchemaPaths lists absolute files or directories outside the
+	// workspace that file:// schema refs may load from. Honored only from the
+	// editor config: a .yayamlls.yaml in a cloned repo could otherwise grant
+	// itself read access to arbitrary local files.
+	TrustedSchemaPaths []string `json:"trustedSchemaPaths,omitempty"`
 }
 
 type KubernetesSettings struct {

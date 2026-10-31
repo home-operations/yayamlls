@@ -57,13 +57,33 @@ func parseK8sTemplate(spec string) (*k8sTemplate, error) {
 }
 
 // Render evaluates and expands the template into a schema URL.
+// GVK parts come from document text: reject anything but plain identifiers
+// before substituting them into the URL.
 func (t *k8sTemplate) Render(group, version, kind string) string {
-	if version == "" || kind == "" {
+	if version == "" || kind == "" ||
+		!isIdent(group, true) || !isIdent(version, false) || !isIdent(kind, false) {
 		return ""
 	}
 	var b strings.Builder
 	renderNodes(&b, t.nodes, k8sVars(group, version, kind))
 	return b.String()
+}
+
+// isIdent reports whether s is made only of [A-Za-z0-9.-] (plus _ unless dns),
+// and isn't a "." or ".." path segment.
+func isIdent(s string, dns bool) bool {
+	if s == "." || s == ".." || strings.HasPrefix(s, "..") {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-':
+		case r == '_' && !dns:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // node is a parsed template fragment: either literal text or a {expression}.

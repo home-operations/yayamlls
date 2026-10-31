@@ -11,7 +11,7 @@ import (
 )
 
 // ToPath converts a file:// URI to a local filesystem path, or "" when the
-// URI is not a file URI. On Windows it strips the leading slash before a
+// URI is not a local file. On Windows it strips the leading slash before a
 // drive letter and converts to backslashes so the result is a valid path.
 func ToPath(uriStr string) string {
 	u, err := url.Parse(uriStr)
@@ -32,6 +32,13 @@ func ToPath(uriStr string) string {
 	p, err := url.PathUnescape(raw)
 	if err != nil {
 		p = u.Path
+	}
+	if u.Host != "" && u.Host != "localhost" {
+		// A remote host is a UNC share on Windows and has no local path elsewhere.
+		if runtime.GOOS != "windows" {
+			return ""
+		}
+		return `\\` + u.Host + filepath.FromSlash(p)
 	}
 	if runtime.GOOS == "windows" {
 		if len(p) >= 3 && p[0] == '/' && p[2] == ':' {

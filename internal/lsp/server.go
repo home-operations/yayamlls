@@ -3,8 +3,10 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/home-operations/yayamlls/internal/config"
@@ -65,10 +67,15 @@ type Server struct {
 	showMu      sync.Mutex
 	pendingShow map[string]string
 
-	// pubSeq supersedes async diagnostic publishes: each publish bumps the
-	// per-URI counter, and a goroutine drops its result if a newer one started.
-	pubMu  sync.Mutex
-	pubSeq map[string]uint64
+	// pubSeq[uri] is the sequence of the latest publish for uri, drawn from the
+	// server-wide pubCounter so a close+reopen can't reuse an in-flight value.
+	// pubMu is held across the check and the notify to keep publishes ordered.
+	pubMu      sync.Mutex
+	pubSeq     map[string]uint64
+	pubCounter uint64
+
+	// shutdownReceived records the LSP shutdown request; ExitCode reports it.
+	shutdownReceived atomic.Bool
 
 	// lintTimers debounces didChange diagnostics per URI so typing doesn't
 	// trigger a parse+validate per keystroke. didOpen and config changes
@@ -87,6 +94,16 @@ type Server struct {
 	workspaceSettings config.Settings
 	overrides         config.Settings
 	workspaceRoot     string
+	workspaceFolders  []string
+
+	// renderCfg is the renderer-affecting input of the last applyLayers, so
+	// the pipeline cache is only invalidated when it actually changed.
+	renderCfg *renderConfig
+}
+
+type renderConfig struct {
+	root      string
+	renderers map[string]json.RawMessage
 }
 
 func New(version string, registry *render.Registry) *Server {
@@ -139,6 +156,15 @@ func New(version string, registry *render.Registry) *Server {
 
 func (s *Server) Handler() *protocol.Handler { return s.handler }
 
+// ExitCode is the process exit code once the connection has closed: 0 after a
+// shutdown request, 1 otherwise.
+func (s *Server) ExitCode() int {
+	if s.shutdownReceived.Load() {
+		return 0
+	}
+	return 1
+}
+
 // kubernetesEnabled gates the code-lens and render paths, which don't go
 // through the resolver.
 func (s *Server) kubernetesEnabled() bool {
@@ -168,11 +194,13 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	}
 	// glsp wires the WorkspaceDidChangeWorkspaceFolders handler but doesn't set
 	// this capability, and clients withhold the notification until it's declared.
-	caps.Workspace = &protocol.ServerCapabilitiesWorkspace{
-		WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{
-			Supported:           new(true),
-			ChangeNotifications: &protocol.BoolOrString{Value: true},
-		},
+	if w := params.Capabilities.Workspace; w != nil && w.WorkspaceFolders != nil && *w.WorkspaceFolders {
+		caps.Workspace = &protocol.ServerCapabilitiesWorkspace{
+			WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{
+				Supported:           new(true),
+				ChangeNotifications: &protocol.BoolOrString{Value: true},
+			},
+		}
 	}
 
 	if w := params.Capabilities.Window; w != nil && w.ShowDocument != nil && w.ShowDocument.Support {
@@ -202,6 +230,10 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	s.settingsMu.Lock()
 	if root != "" {
 		s.workspaceRoot = root
+	}
+	s.workspaceFolders = s.workspaceFolders[:0]
+	for _, f := range params.WorkspaceFolders {
+		s.workspaceFolders = append(s.workspaceFolders, f.URI)
 	}
 	s.workspaceSettings = ws
 	if init := settingsFromInitOptions(params.InitializationOptions); init != nil {
@@ -263,8 +295,13 @@ func (s *Server) applyLayers() {
 	root := s.workspaceRoot
 	s.settingsMu.Unlock()
 	s.resolver.SetSettings(effective)
-	s.schemas.SetTrustRoot(uriToPath(root))
+	s.schemas.SetTrustRoot(uriToPath(root), ov.TrustedSchemaPaths)
+	if len(ws.TrustedSchemaPaths) > 0 {
+		s.warn("yayamlls: ignored trustedSchemaPaths from .yayamlls.yaml for safety; " +
+			"declare it in your editor/global config instead")
+	}
 	s.renderer.SetWorkspaceRoot(uriToPath(root))
+	rootPath := uriToPath(root)
 	// Subprocess renderer commands from an untrusted workspace .yayamlls.yaml
 	// are dropped here (config.TrustedRenderers); only command-less entries and
 	// the trusted client layer reach the registry.
@@ -273,6 +310,11 @@ func (s *Server) applyLayers() {
 		s.warn(fmt.Sprintf("yayamlls: ignored workspace renderer command(s) %s from .yayamlls.yaml for safety; "+
 			"declare subprocess renderers in your editor/global config instead", strings.Join(dropped, ", ")))
 	}
+	cfg := &renderConfig{root: rootPath, renderers: renderers}
+	s.settingsMu.Lock()
+	changed := !reflect.DeepEqual(s.renderCfg, cfg)
+	s.renderCfg = cfg
+	s.settingsMu.Unlock()
 	if errs := s.renderer.Configure(renderers); len(errs) > 0 {
 		msgs := make([]string, len(errs))
 		for i, e := range errs {
@@ -290,6 +332,11 @@ func (s *Server) applyLayers() {
 		timeout = time.Duration(*ms) * time.Millisecond
 	}
 	s.pipeline.SetTimeout(timeout)
+	// Renders are cached by (URI, text hash), so changed renderer config
+	// would otherwise keep serving results from the old one.
+	if changed {
+		s.pipeline.InvalidateAll()
+	}
 }
 
 // setWorkspaceLayer replaces the .yayamlls.yaml layer (e.g. after a
@@ -378,6 +425,7 @@ func (s *Server) initialized(ctx *glsp.Context, params *protocol.InitializedPara
 }
 
 func (s *Server) shutdown(ctx *glsp.Context) error {
+	s.shutdownReceived.Store(true)
 	protocol.SetTraceValue(protocol.TraceValueOff)
 	return nil
 }
@@ -406,9 +454,21 @@ func (s *Server) diagnosticOptions() diagnostics.Options {
 }
 
 func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
-	diags := lint.RenderedDiagnostics(s.schemas, s.resolver, out, err, s.diagnosticOptions())
+	d, ok := s.docs.Get(uri)
+	if !ok {
+		return
+	}
+	parsed := d.Parsed()
+	diags := lint.RenderedDiagnostics(s.schemas, s.resolver, parsed, out, err,
+		s.diagnosticOptions(), protocol.DiagnosticSeverityError)
 
+	// The open check repeats under rendMu: didClose closes the document before
+	// clearRenderState takes rendMu, so a late Notify can't repopulate it.
 	s.rendMu.Lock()
+	if _, ok := s.docs.Get(uri); !ok {
+		s.rendMu.Unlock()
+		return
+	}
 	s.renderedDiags[uri] = diags
 	if out != nil {
 		s.renderedRaw[uri] = out.Raw
@@ -422,10 +482,6 @@ func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {
 		go s.showInEditor(s.currentCall(), uri, kind)
 	}
 
-	d, ok := s.docs.Get(uri)
-	if !ok {
-		return
-	}
 	s.schedulePublish(d)
 }
 
@@ -466,8 +522,13 @@ func (s *Server) schedulePublish(d *document.Document) {
 	}
 	uri := d.URI
 	s.pubMu.Lock()
-	s.pubSeq[uri]++
-	seq := s.pubSeq[uri]
+	if _, ok := s.docs.Get(uri); !ok {
+		s.pubMu.Unlock()
+		return
+	}
+	s.pubCounter++
+	seq := s.pubCounter
+	s.pubSeq[uri] = seq
 	s.pubMu.Unlock()
 
 	opts := s.diagnosticOptions()
@@ -479,9 +540,8 @@ func (s *Server) schedulePublish(d *document.Document) {
 		diags = diagnostics.ParseSuppressions(d.Text).Filter(diags)
 
 		s.pubMu.Lock()
-		current := s.pubSeq[uri] == seq
-		s.pubMu.Unlock()
-		if !current {
+		defer s.pubMu.Unlock()
+		if s.pubSeq[uri] != seq {
 			return
 		}
 		v := protocol.UInteger(d.Version)
@@ -514,14 +574,20 @@ func (s *Server) debouncePublish(uri string) {
 	if t, ok := s.lintTimers[uri]; ok {
 		t.Stop()
 	}
-	s.lintTimers[uri] = time.AfterFunc(s.lintDebounce, func() {
+	var self *time.Timer
+	self = time.AfterFunc(s.lintDebounce, func() {
 		s.lintMu.Lock()
+		if s.lintTimers[uri] != self {
+			s.lintMu.Unlock()
+			return
+		}
 		delete(s.lintTimers, uri)
 		s.lintMu.Unlock()
 		if d, ok := s.docs.Get(uri); ok {
 			s.publishDiagnostics(nil, d)
 		}
 	})
+	s.lintTimers[uri] = self
 	s.lintMu.Unlock()
 }
 
@@ -536,13 +602,11 @@ func (s *Server) cancelDebounce(uri string) {
 	s.lintMu.Unlock()
 }
 
-// forgetPublish advances a closed document's counter so an in-flight publish
-// goroutine that captured the prior seq can never match again. Deleting the
-// entry would let a close+reopen of the same URI restart the sequence and
-// resurrect diagnostics for the pre-close text.
+// forgetPublish drops a closed document's entry so an in-flight publish can't
+// match it.
 func (s *Server) forgetPublish(uri string) {
 	s.pubMu.Lock()
-	s.pubSeq[uri]++
+	delete(s.pubSeq, uri)
 	s.pubMu.Unlock()
 }
 
