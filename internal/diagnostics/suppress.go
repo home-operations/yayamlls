@@ -58,6 +58,7 @@ func ParseSuppressions(text string) Suppressor {
 	blockIndent := -1 // parent indent of the open block scalar; -1 when none
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
 		if blocked {
 			s.lines[uint32(i)] = true
 		}
