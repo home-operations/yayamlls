@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // The catalog goes through the schema disk cache: a second process-lifetime
@@ -51,5 +52,55 @@ func TestCatalog_LoadServedFromDiskCache(t *testing.T) {
 	}
 	if atomic.LoadInt64(&hits) != 1 {
 		t.Errorf("expected no second origin hit, got %d", hits)
+	}
+}
+
+func TestCatalog_RetriesAfterFailure(t *testing.T) {
+	enableLoopbackForTest(t)
+	const body = `{"schemas":[{"name":"x","url":"https://example.com/x.json","fileMatch":["x.yaml"]}]}`
+
+	var fail atomic.Bool
+	fail.Store(true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if fail.Load() {
+			http.Error(w, "down", http.StatusInternalServerError)
+			return
+		}
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+
+	prev := CacheDir
+	CacheDir = t.TempDir()
+	t.Cleanup(func() { CacheDir = prev })
+
+	loaded := make(chan struct{}, 1)
+	c := NewCatalog(srv.URL)
+	c.retryInterval = time.Hour
+	c.Load(func() { loaded <- struct{}{} })
+	c.Wait()
+	if c.Match("/tmp/x.yaml") != "" {
+		t.Fatal("failed load must not match")
+	}
+
+	// Inside the interval a Match must not retry.
+	fail.Store(false)
+	c.Match("/tmp/x.yaml")
+	time.Sleep(50 * time.Millisecond)
+	if c.ready.Load() {
+		t.Fatal("retry fired before the interval elapsed")
+	}
+
+	c.mu.Lock()
+	c.lastTry = time.Now().Add(-2 * time.Hour)
+	c.mu.Unlock()
+	c.Match("/tmp/x.yaml")
+	select {
+	case <-loaded:
+	case <-time.After(5 * time.Second):
+		t.Fatal("reload hook not called after successful retry")
+	}
+	if got := c.Match("/tmp/x.yaml"); got != "https://example.com/x.json" {
+		t.Errorf("Match after retry = %q", got)
 	}
 }

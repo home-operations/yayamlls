@@ -3,6 +3,7 @@ package flate_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -265,9 +266,9 @@ data:
 	}
 }
 
-// A timed-out build is negative-cached: other documents fail fast instead of
-// re-spending the timeout, until the next tree change clears it.
-func TestFlate_TimeoutNegativeCachedUntilInvalidated(t *testing.T) {
+// A context that expired before the build started must not build or poison
+// the cache for live callers.
+func TestFlate_ExpiredContextNotNegativeCached(t *testing.T) {
 	k8s := writeFixture(t)
 	r := flate.New()
 	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(k8s) + `}`)); err != nil {
@@ -277,23 +278,81 @@ func TestFlate_TimeoutNegativeCachedUntilInvalidated(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), -time.Second)
 	defer cancel()
-	if _, err := r.Render(ctx, ksDoc("apps-a")); err == nil {
-		t.Fatal("expected error from timed-out render")
+	if _, err := r.Render(ctx, ksDoc("apps-a")); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline error from expired render, got %v", err)
 	}
 
-	// Without the negative cache this render would succeed.
-	if _, err := r.Render(context.Background(), ksDoc("apps-a")); err == nil {
-		t.Fatal("expected cached timeout error, got success")
-	}
-
-	r.InvalidateTree("")
 	out, err := r.Render(context.Background(), ksDoc("apps-a"))
 	if err != nil {
-		t.Fatalf("render after invalidation: %v", err)
+		t.Fatalf("render after expired waiter: %v", err)
 	}
 	if len(out.Manifests) != 1 || out.Manifests[0].Name != "cm-apps-a" {
-		t.Fatalf("expected cm-apps-a after invalidation, got %+v", out.Manifests)
+		t.Fatalf("expected cm-apps-a, got %+v", out.Manifests)
 	}
+}
+
+func TestFlate_ScopesByNamespace(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	for _, ns := range []string{"ns-a", "ns-b"} {
+		writeFile(t, filepath.Join(root, "flux", ns+".yaml"), `---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps
+  namespace: `+ns+`
+spec:
+  interval: 10m
+  path: ./`+ns+`
+  sourceRef: {kind: GitRepository, name: flux-system, namespace: flux-system}
+`)
+		writeFile(t, filepath.Join(root, ns, "kustomization.yaml"), "resources:\n- cm.yaml\n")
+		writeFile(t, filepath.Join(root, ns, "cm.yaml"), `---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: cm-`+ns+`, namespace: default}
+`)
+	}
+	r := flate.New()
+	if err := r.Configure(json.RawMessage(`{"path":` + jsonQuote(root) + `}`)); err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	for _, c := range []struct {
+		name, ns, want string
+		wantErr        string
+	}{
+		{name: "ns-a", ns: "ns-a", want: "cm-ns-a"},
+		{name: "ns-b", ns: "ns-b", want: "cm-ns-b"},
+		{name: "unknown namespace", ns: "ns-c", wantErr: `no Kustomization named "apps" in namespace "ns-c"`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			doc := ksDoc("apps")
+			doc.Namespace = c.ns
+			out, err := r.Render(context.Background(), doc)
+			if c.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+					t.Fatalf("expected %q, got %v", c.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			if len(out.Manifests) != 1 || out.Manifests[0].Name != c.want {
+				t.Fatalf("expected %s, got %s", c.want, out.Raw)
+			}
+		})
+	}
+
+	t.Run("empty namespace matches by name", func(t *testing.T) {
+		out, err := r.Render(context.Background(), ksDoc("apps"))
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		if len(out.Manifests) != 2 {
+			t.Fatalf("expected both namespaces' manifests, got %s", out.Raw)
+		}
+	})
 }
 
 // A cancelled render must not be cached: the next caller gets a fresh one.

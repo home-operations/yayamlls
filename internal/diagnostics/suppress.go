@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"regexp"
 	"strings"
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -54,13 +55,21 @@ func (s Suppressor) Filter(diags []protocol.Diagnostic) []protocol.Diagnostic {
 func ParseSuppressions(text string) Suppressor {
 	s := Suppressor{lines: map[uint32]bool{}}
 	blocked := false
+	blockIndent := -1 // parent indent of the open block scalar; -1 when none
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		if blocked {
 			s.lines[uint32(i)] = true
 		}
-		comment, ok := commentOf(line)
-		if !ok {
+		if blockIndent >= 0 && (strings.TrimSpace(line) == "" || indentOf(line) > blockIndent) {
+			continue
+		}
+		code, comment, hasComment := line, "", false
+		if ci := CommentStart(line); ci >= 0 {
+			code, comment, hasComment = line[:ci], line[ci+1:], true
+		}
+		blockIndent = blockScalarParentIndent(code)
+		if !hasComment {
 			continue
 		}
 		switch firstToken(comment) {
@@ -81,22 +90,81 @@ func ParseSuppressions(text string) Suppressor {
 	return s
 }
 
-// commentOf returns the comment portion of a YAML line: the text after the
-// "#". A "#" opens a comment only at line start or when preceded by
-// whitespace, matching YAML's inline-comment rule. This is a heuristic: it
-// does not track quoted strings, but only the specific directive tokens are
-// acted on, so a stray "#" inside a value is harmless unless it literally
-// spells a directive.
-func commentOf(line string) (string, bool) {
+// CommentStart returns the index of the "#" opening a comment on line, or -1.
+// A quote opens a scalar only at a token start, so the apostrophe in `it's` is
+// plain text.
+func CommentStart(line string) int {
+	var quote byte
 	for i := 0; i < len(line); i++ {
-		if line[i] != '#' {
-			continue
-		}
-		if i == 0 || line[i-1] == ' ' || line[i-1] == '\t' {
-			return line[i+1:], true
+		c := line[i]
+		switch {
+		case quote != 0:
+			if c == '\\' && quote == '"' {
+				i++
+			} else if c == quote {
+				quote = 0
+			}
+		case (c == '\'' || c == '"') && atTokenStart(line, i):
+			quote = c
+		case c == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t'):
+			return i
 		}
 	}
-	return "", false
+	return -1
+}
+
+// atTokenStart reports whether i is at line start or follows `: `, `- `, `? `,
+// `[`, `{` or `,`.
+func atTokenStart(line string, i int) bool {
+	j := i
+	for j > 0 && (line[j-1] == ' ' || line[j-1] == '\t') {
+		j--
+	}
+	if j == 0 {
+		return true
+	}
+	switch line[j-1] {
+	case '[', '{', ',':
+		return true
+	case ':':
+		return j < i
+	case '-', '?':
+		return j < i && (j == 1 || line[j-2] == ' ' || line[j-2] == '\t')
+	}
+	return false
+}
+
+var blockScalarHeader = regexp.MustCompile(`[|>](?:[+-][1-9]?|[1-9][+-]?)?$`)
+
+// blockScalarParentIndent returns the indent a following line must exceed to
+// be inside a block scalar opened by line, or -1.
+func blockScalarParentIndent(line string) int {
+	code := strings.TrimRight(line, " \t")
+	loc := blockScalarHeader.FindStringIndex(code)
+	if loc == nil {
+		return -1
+	}
+	before := strings.TrimRight(code[:loc[0]], " \t")
+	if before != "" {
+		last := before[strings.LastIndexAny(before, " \t")+1:]
+		if !strings.HasSuffix(before, ":") && !strings.HasSuffix(before, "-") &&
+			last[0] != '!' && last[0] != '&' {
+			return -1
+		}
+	}
+	// A `- key: |` entry's mapping sits after the dashes.
+	indent := indentOf(line)
+	rest := line[indent:]
+	for strings.HasPrefix(rest, "- ") {
+		trimmed := strings.TrimLeft(rest[1:], " ")
+		indent += len(rest) - len(trimmed)
+		rest = trimmed
+	}
+	return indent
+}
+
+func indentOf(line string) int {
+	return len(line) - len(strings.TrimLeft(line, " "))
 }
 
 // codeBeforeComment reports whether non-whitespace content precedes the

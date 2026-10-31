@@ -11,11 +11,12 @@ import (
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 func TestRenderDiagnostics_UnavailableRendererIsSilent(t *testing.T) {
-	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), nil,
-		render.ErrRendererUnavailable, diagnostics.Options{})
+	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), nil, nil,
+		render.ErrRendererUnavailable, diagnostics.Options{}, protocol.DiagnosticSeverityError)
 	if diags != nil {
 		t.Errorf("expected no diagnostics for unavailable renderer, got %v", diags)
 	}
@@ -23,8 +24,8 @@ func TestRenderDiagnostics_UnavailableRendererIsSilent(t *testing.T) {
 
 func TestRenderDiagnostics_RenderErrorSurfacedWithProviderSource(t *testing.T) {
 	out := &render.RenderedOutput{Provider: "flate"}
-	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), out,
-		errors.New("boom"), diagnostics.Options{})
+	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), nil, out,
+		errors.New("boom"), diagnostics.Options{}, protocol.DiagnosticSeverityWarning)
 	if len(diags) != 1 {
 		t.Fatalf("expected one diagnostic, got %d", len(diags))
 	}
@@ -33,6 +34,154 @@ func TestRenderDiagnostics_RenderErrorSurfacedWithProviderSource(t *testing.T) {
 	}
 	if diags[0].Source == nil || *diags[0].Source != "yayamlls/flate" {
 		t.Errorf("source = %v, want yayamlls/flate", diags[0].Source)
+	}
+	if diags[0].Severity == nil || *diags[0].Severity != protocol.DiagnosticSeverityWarning {
+		t.Errorf("severity = %v, want the requested failure severity", diags[0].Severity)
+	}
+}
+
+const helmReleaseSrc = `apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: eventrouter
+spec:
+  values:
+    controllers:
+      main:
+        automountServiceAccountToken: false
+    redis:
+      auth: nope
+`
+
+func helmValuesErr(body string) error {
+	return errors.New("flate: HelmRelease/monitoring/eventrouter: helm template monitoring/eventrouter: " +
+		"values don't meet the specifications of the schema(s) in the following chart(s):\n" + body)
+}
+
+func TestRenderedDiagnostics_HelmValuesViolations(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      string
+		body     string
+		wantMsg  []string
+		wantLine []uint32
+	}{
+		{
+			name:     "unknown key anchors on the key",
+			src:      helmReleaseSrc,
+			body:     "app-template:\n- at '/controllers/main/automountServiceAccountToken': false schema\n",
+			wantMsg:  []string{"helm values at '/controllers/main/automountServiceAccountToken': false schema"},
+			wantLine: []uint32{8},
+		},
+		{
+			name:     "missing value anchors on deepest existing key",
+			src:      helmReleaseSrc,
+			body:     "app-template:\n- at '/defaultPodOptions': got null, want object\n",
+			wantMsg:  []string{"helm values at '/defaultPodOptions': got null, want object"},
+			wantLine: []uint32{5},
+		},
+		{
+			name: "subchart pointers are relative to its values key",
+			src:  helmReleaseSrc,
+			body: "app-template:\n- at '': missing property 'x'\nredis:\n- at '/auth': got string, want object\n",
+			wantMsg: []string{
+				"helm values at '': missing property 'x'",
+				"helm values at '/redis/auth': got string, want object",
+			},
+			wantLine: []uint32{5, 10},
+		},
+		{
+			name:     "nested causes are each reported",
+			src:      helmReleaseSrc,
+			body:     "app-template:\n- at '/controllers/main': oneOf failed\n  - at '/controllers/main': got object, want string\n",
+			wantMsg:  []string{"helm values at '/controllers/main': oneOf failed", "helm values at '/controllers/main': got object, want string"},
+			wantLine: []uint32{7, 7},
+		},
+		{
+			name:     "no spec.values stays at the document start",
+			src:      "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: eventrouter\n",
+			body:     "app-template:\n- at '/a': false schema\n",
+			wantMsg:  []string{"helm values at '/a': false schema"},
+			wantLine: []uint32{0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &render.RenderedOutput{Provider: "flate"}
+			diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), yamlast.Parse([]byte(tt.src)), out,
+				helmValuesErr(tt.body), diagnostics.Options{}, protocol.DiagnosticSeverityWarning)
+			if len(diags) != len(tt.wantMsg) {
+				t.Fatalf("got %d diagnostics, want %d: %+v", len(diags), len(tt.wantMsg), diags)
+			}
+			for i, d := range diags {
+				if d.Message != tt.wantMsg[i] {
+					t.Errorf("diag %d message = %q, want %q", i, d.Message, tt.wantMsg[i])
+				}
+				if d.Range.Start.Line != tt.wantLine[i] {
+					t.Errorf("diag %d line = %d, want %d", i, d.Range.Start.Line, tt.wantLine[i])
+				}
+				if d.Severity == nil || *d.Severity != protocol.DiagnosticSeverityError {
+					t.Errorf("diag %d severity = %v, want error", i, d.Severity)
+				}
+			}
+		})
+	}
+}
+
+func TestRenderedDiagnostics_HelmValuesJoinedFailures(t *testing.T) {
+	src := yamlast.Parse([]byte(helmReleaseSrc))
+	err := helmValuesErr("app-template:\n- at '/controllers/main/automountServiceAccountToken': false schema\n" +
+		"; HelmRelease/other/eventrouter: source not found")
+	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), src, &render.RenderedOutput{Provider: "flate"},
+		err, diagnostics.Options{}, protocol.DiagnosticSeverityWarning)
+	if len(diags) != 2 {
+		t.Fatalf("got %d diagnostics, want the violation plus the unrelated failure: %+v", len(diags), diags)
+	}
+	if diags[0].Range.Start.Line != 8 || *diags[0].Severity != protocol.DiagnosticSeverityError {
+		t.Errorf("violation = %+v, want an error on line 8", diags[0])
+	}
+	if !strings.Contains(diags[1].Message, "source not found") || *diags[1].Severity != protocol.DiagnosticSeverityWarning {
+		t.Errorf("unrelated failure = %+v, want it kept at the failure severity", diags[1])
+	}
+}
+
+func TestRenderedDiagnostics_HelmValuesRootChartNotPrefixed(t *testing.T) {
+	src := yamlast.Parse([]byte(`apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: x
+spec:
+  chart:
+    spec:
+      chart: redis
+  values:
+    redis:
+      auth: nope
+    replicas: bad
+`))
+	diags := RenderedDiagnostics(schema.NewStore(), schema.NewResolver(), src, &render.RenderedOutput{Provider: "flate"},
+		helmValuesErr("redis:\n- at '/replicas': got string, want integer\n"),
+		diagnostics.Options{}, protocol.DiagnosticSeverityError)
+	if len(diags) != 1 || diags[0].Range.Start.Line != 11 {
+		t.Fatalf("want one diagnostic on replicas (line 11), got %+v", diags)
+	}
+	if want := "helm values at '/replicas': got string, want integer"; diags[0].Message != want {
+		t.Errorf("message = %q, want %q", diags[0].Message, want)
+	}
+}
+
+func TestUnquoteHelmPointer(t *testing.T) {
+	tests := map[string]string{
+		`/a/b`:          "/a/b",
+		`/it\'s`:        "/it's",
+		`/say "hi"`:     `/say "hi"`,
+		`/tab\there`:    "/tab\there",
+		`/bad\escape\q`: `/bad\escape\q`,
+	}
+	for in, want := range tests {
+		if got := unquoteHelmPointer(in); got != want {
+			t.Errorf("unquoteHelmPointer(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

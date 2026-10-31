@@ -49,10 +49,12 @@ const freshTTL = time.Hour
 // bodies on disk and revalidates them with ETags.
 type diskLoader struct {
 	client *http.Client
+	// dir is CacheDir at construction: background loads must not read the global.
+	dir string
 }
 
 func newDiskLoader() *diskLoader {
-	return &diskLoader{client: safeHTTPClient(fetchTimeout)}
+	return &diskLoader{client: safeHTTPClient(fetchTimeout), dir: CacheDir}
 }
 
 func (l *diskLoader) Load(url string) (any, error) {
@@ -69,10 +71,10 @@ type cacheMeta struct {
 }
 
 func (l *diskLoader) loadBytes(url string) ([]byte, error) {
-	if err := os.MkdirAll(CacheDir, 0o755); err != nil {
+	if err := os.MkdirAll(l.dir, 0o755); err != nil {
 		return l.plainGET(url)
 	}
-	bodyPath, metaPath := pathsFor(url)
+	bodyPath, metaPath := l.pathsFor(url)
 	cachedBody, _ := os.ReadFile(bodyPath)
 	meta, _ := readMeta(metaPath)
 
@@ -189,11 +191,11 @@ func (l *diskLoader) conditionalGET(url, etag string) (*http.Response, error) {
 	return l.client.Do(req)
 }
 
-func pathsFor(url string) (body, meta string) {
+func (l *diskLoader) pathsFor(url string) (body, meta string) {
 	sum := sha256.Sum256([]byte(url))
 	digest := hex.EncodeToString(sum[:])
-	body = filepath.Join(CacheDir, digest+".json")
-	meta = filepath.Join(CacheDir, digest+".meta.json")
+	body = filepath.Join(l.dir, digest+".json")
+	meta = filepath.Join(l.dir, digest+".meta.json")
 	return
 }
 

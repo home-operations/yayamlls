@@ -242,6 +242,11 @@ on the resource offers **View rendered** and **Diff rendered**; running it
 opens the result in the editor via a `window/showDocument` request, so no
 client-specific glue is needed.
 
+When a chart rejects a `HelmRelease`'s values against its `values.schema.json`,
+each violation is reported on the offending key under `spec.values` (or the
+nearest enclosing key that exists, e.g. when the value comes from
+`valuesFrom`) and counts as an error for `yayamlls validate --render`.
+
 Clients that open local-file `showDocument` requests display it directly —
 Neovim ≥ 0.11 and VS Code do. Zed currently no-ops local-file `showDocument`
 ([zed#53123][zed-showdoc]), so the lens runs but nothing opens; it will work
@@ -335,6 +340,25 @@ See [`.yayamlls.yaml.example`](.yayamlls.yaml.example) for a copyable starter.
 Same shape works via `initializationOptions` or
 `workspace/didChangeConfiguration`. Precedence (low → high):
 `.yayamlls.yaml` → `initializationOptions` → `didChangeConfiguration`.
+
+### Schemas outside the workspace
+
+In the editor, `file://` schema refs may only load files inside the workspace
+root, or none at all with no folder open, so a cloned repo can't read arbitrary
+local files. To allow other locations, e.g. a schema cache written by
+[yaml-companion.nvim][yaml-companion], list absolute paths in
+`trustedSchemaPaths`. It is read only from editor config, never from
+`.yayamlls.yaml`:
+
+```lua
+vim.lsp.config("yayamlls", {
+  init_options = {
+    trustedSchemaPaths = { vim.fn.stdpath("data") .. "/yaml-companion.nvim/crd-cache" },
+  },
+})
+```
+
+[yaml-companion]: https://github.com/mosheavni/yaml-companion.nvim
 
 ## Suppressing diagnostics
 

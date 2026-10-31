@@ -88,3 +88,24 @@ func TestEnums_AcrossComposition(t *testing.T) {
 		t.Errorf("plain enums: got %v want 2", plain)
 	}
 }
+
+func TestResolve_NumericObjectKeys(t *testing.T) {
+	tests := []struct {
+		name, schema, path string
+	}{
+		{"properties", `{"properties":{"8080":{"type":"string"}}}`, "/8080"},
+		{"patternProperties", `{"patternProperties":{"^[0-9]+$":{"type":"string"}}}`, "/2"},
+		{"additionalProperties", `{"additionalProperties":{"type":"string"}}`, "/2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if Resolve(compileSchema(t, tt.schema), tt.path) == nil {
+				t.Errorf("Resolve(%s) = nil", tt.path)
+			}
+		})
+	}
+	arr := compileSchema(t, `{"items":{"type":"string"}}`)
+	if Resolve(arr, "/0") == nil {
+		t.Error("array items lookup must still work")
+	}
+}

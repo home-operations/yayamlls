@@ -226,3 +226,29 @@ func TestTrustedRenderers_OverrideWinsOnCollision(t *testing.T) {
 		t.Fatalf("override entry should win, got command %v", probe.Command)
 	}
 }
+
+func TestMerge_DoesNotMutateBaseRenderers(t *testing.T) {
+	base := Settings{Renderers: map[string]json.RawMessage{"flate": json.RawMessage(`{"binary":"x"}`)}}
+	override := Settings{Renderers: map[string]json.RawMessage{
+		"flate": json.RawMessage(`{"binary":"y"}`),
+		"other": json.RawMessage(`{}`),
+	}}
+	got := Merge(base, override)
+	if string(got.Renderers["flate"]) != `{"binary":"y"}` || len(got.Renderers) != 2 {
+		t.Errorf("merge result wrong: %v", got.Renderers)
+	}
+	if len(base.Renderers) != 1 || string(base.Renderers["flate"]) != `{"binary":"x"}` {
+		t.Errorf("Merge mutated base: %v", base.Renderers)
+	}
+}
+
+func TestExpandRef_LeavesURLsAlone(t *testing.T) {
+	for _, ref := range []string{"http://a/b.json", "https://a/b.json", "file:///a/b.json", "embedded://yayamlls/x.json"} {
+		if got := expandRef(ref, "/root"); got != ref {
+			t.Errorf("expandRef(%q) = %q, want unchanged", ref, got)
+		}
+	}
+	if got := expandRef("s/a.json", "/root"); got != filepath.Join("/root", "s/a.json") {
+		t.Errorf("relative ref = %q", got)
+	}
+}

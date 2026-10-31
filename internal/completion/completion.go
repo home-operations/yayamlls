@@ -129,20 +129,20 @@ func insertTextForProperty(k string, ps *jsonschema.Schema, ic insertCtx) (strin
 		if req := schema.Required(rs); len(req) > 0 {
 			sort.Strings(req)
 			var b strings.Builder
-			b.WriteString(k + ":")
+			b.WriteString(snippetEscape(k) + ":")
 			for i, child := range req {
-				fmt.Fprintf(&b, "\n%s%s: $%d", ic.indent, child, i+1)
+				fmt.Fprintf(&b, "\n%s%s: $%d", ic.indent, snippetEscape(child), i+1)
 			}
 			return b.String(), true
 		}
-		return k + ":\n" + ic.indent + "$1", true
+		return snippetEscape(k) + ":\n" + ic.indent + "$1", true
 	case isType(rs, "array"):
-		return k + ":\n" + ic.indent + "- $1", true
+		return snippetEscape(k) + ":\n" + ic.indent + "- $1", true
 	default:
 		if rs != nil && rs.Default != nil {
-			return fmt.Sprintf("%s: ${1:%s}", k, snippetEscape(fmt.Sprintf("%v", *rs.Default))), true
+			return fmt.Sprintf("%s: ${1:%s}", snippetEscape(k), snippetEscape(yamlast.FormatValue(*rs.Default))), true
 		}
-		return k + ": $1", true
+		return snippetEscape(k) + ": $1", true
 	}
 }
 
@@ -169,14 +169,21 @@ func valueCompletions(s *jsonschema.Schema, ic insertCtx) *protocol.CompletionLi
 	kind := protocol.CompletionItemKindValue
 	items := make([]protocol.CompletionItem, 0, len(values))
 	for _, v := range values {
+		text := yamlast.FormatValue(v)
+		label := text
+		if str, ok := v.(string); ok {
+			label = str
+		}
 		item := protocol.CompletionItem{
-			Label: fmt.Sprintf("%v", v),
+			Label: label,
 			Kind:  &kind,
 		}
+		// The label stays bare for client-side filtering; the inserted text is
+		// quoted when needed and spaced after a bare "key:".
 		if ic.needSpace {
-			// Right after "key:": insert " value" but keep the label bare so
-			// client-side filtering still matches what the user types.
-			item.InsertText = new(" " + item.Label)
+			item.InsertText = new(" " + text)
+		} else if text != label {
+			item.InsertText = new(text)
 		}
 		items = append(items, item)
 	}

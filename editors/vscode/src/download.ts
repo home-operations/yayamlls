@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
@@ -25,9 +26,21 @@ function assetFor(name: string, version: string): { asset: string; binary: strin
   };
 }
 
+// Release tags carry no leading "v"; one is tolerated and stripped. The result
+// ends up in file paths and URLs, so anything else is rejected.
+const VERSION_RE = /^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/;
+
+function validVersion(raw: string): string {
+  const version = raw.replace(/^v/, "");
+  if (!VERSION_RE.test(version)) {
+    throw new Error(`invalid release version "${raw}"`);
+  }
+  return version;
+}
+
 async function resolveVersion(repo: string, requested: string): Promise<string> {
   if (requested && requested !== "latest") {
-    return requested;
+    return validVersion(requested);
   }
   const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
     headers: { Accept: "application/vnd.github+json", "User-Agent": "yayamlls-vscode" },
@@ -39,7 +52,15 @@ async function resolveVersion(repo: string, requested: string): Promise<string> 
   if (!body.tag_name) {
     throw new Error(`latest ${repo} release has no tag_name`);
   }
-  return body.tag_name; // tags carry no leading "v"
+  return validVersion(body.tag_name);
+}
+
+async function fetchBytes(url: string): Promise<Buffer> {
+  const res = await fetch(url, { headers: { "User-Agent": "yayamlls-vscode" } });
+  if (!res.ok) {
+    throw new Error(`download failed: ${res.status} ${url}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -78,17 +99,24 @@ export async function ensureBinary(
   await fs.mkdir(versionDir, { recursive: true });
 
   const url = `https://github.com/${repo}/releases/download/${version}/${asset}`;
-  const res = await fetch(url, { headers: { "User-Agent": "yayamlls-vscode" } });
-  if (!res.ok || !res.body) {
-    throw new Error(`download failed: ${res.status} ${url}`);
+  const archive = await fetchBytes(url);
+  // GoReleaser's split checksum file: "<hex sha256>  <asset>".
+  const expected = (await fetchBytes(`${url}.sha256`)).toString("utf8").trim().split(/\s+/)[0];
+  const actual = createHash("sha256").update(archive).digest("hex");
+  if (!expected || actual !== expected.toLowerCase()) {
+    throw new Error(`checksum mismatch for ${asset}: got ${actual}, expected ${expected}`);
   }
-  const archivePath = path.join(os.tmpdir(), asset);
-  await fs.writeFile(archivePath, Buffer.from(await res.arrayBuffer()));
 
-  // `tar` ships on macOS, Linux, and Windows 10 1803+ (bsdtar handles .zip too),
-  // so a single invocation extracts every asset type without extra deps.
-  await execFileP("tar", ["-xf", archivePath, "-C", versionDir]);
-  await fs.rm(archivePath, { force: true });
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "yayamlls-"));
+  try {
+    const archivePath = path.join(tmpDir, asset);
+    await fs.writeFile(archivePath, archive);
+    // `tar` ships on macOS, Linux, and Windows 10 1803+ (bsdtar handles .zip too),
+    // so a single invocation extracts every asset type without extra deps.
+    await execFileP("tar", ["-xf", archivePath, "-C", versionDir]);
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
 
   if (process.platform !== "win32") {
     await fs.chmod(binaryPath, 0o755);

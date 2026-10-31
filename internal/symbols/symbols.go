@@ -96,13 +96,16 @@ func mappingChildren(m *ast.MappingNode, src string) []protocol.DocumentSymbol {
 
 func mappingEntrySymbol(kv *ast.MappingValueNode, src string) protocol.DocumentSymbol {
 	keyName := keyString(kv.Key)
+	if keyName == "" {
+		keyName = `""`
+	}
 	kind, detail := classify(kv.Value)
-	r := rangeFor(kv.Key, src)
+	sel := rangeFor(kv.Key, src)
 	sym := protocol.DocumentSymbol{
 		Name:           keyName,
 		Kind:           kind,
-		Range:          r,
-		SelectionRange: r,
+		Range:          entryRange(sel, kv.Value, src),
+		SelectionRange: sel,
 	}
 	if detail != "" {
 		sym.Detail = &detail
@@ -114,6 +117,19 @@ func mappingEntrySymbol(kv *ast.MappingValueNode, src string) protocol.DocumentS
 		sym.Children = sequenceChildren(v, src)
 	}
 	return sym
+}
+
+// entryRange extends the key range to cover the value, so the entry's children
+// fall inside its range as LSP requires.
+func entryRange(key protocol.Range, value ast.Node, src string) protocol.Range {
+	if value == nil {
+		return key
+	}
+	end := yamlast.NodeRange(src, value).End
+	if end.Line > key.End.Line || (end.Line == key.End.Line && end.Character > key.End.Character) {
+		key.End = end
+	}
+	return key
 }
 
 func sequenceChildren(s *ast.SequenceNode, src string) []protocol.DocumentSymbol {

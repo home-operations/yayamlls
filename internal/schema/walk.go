@@ -102,16 +102,14 @@ func stepDepth(s *jsonschema.Schema, seg string, depth int) *jsonschema.Schema {
 				return it[idx]
 			}
 		}
-	} else if p, ok := s.Properties[seg]; ok {
+	}
+	if p, ok := s.Properties[seg]; ok {
 		return p
 	}
 	for _, src := range mergeSources(s) {
 		if r := stepDepth(src, seg, depth+1); r != nil {
 			return r
 		}
-	}
-	if isNumber(seg) {
-		return nil
 	}
 	// patternProperties before additionalProperties, matching JSON Schema
 	// precedence; common for label/annotation maps and `x-` extension keys.

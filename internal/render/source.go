@@ -8,13 +8,14 @@ import (
 )
 
 type SourceDocument struct {
-	URI      string
-	Path     string
-	Text     string
-	AST      *ast.File
-	Kind     string
-	APIGroup string
-	Name     string
+	URI       string
+	Path      string
+	Text      string
+	AST       *ast.File
+	Kind      string
+	APIGroup  string
+	Name      string
+	Namespace string
 }
 
 type RenderedManifest struct {

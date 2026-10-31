@@ -39,7 +39,7 @@ func TestFluxKustomizationValidates(t *testing.T) {
 	conn := &rpcConn{w: stdin, r: bufio.NewReader(stdout)}
 	if _, err := conn.send("initialize", map[string]any{
 		"processId":    nil,
-		"rootUri":      nil,
+		"rootUri":      fixturesRootURI(),
 		"capabilities": map[string]any{},
 	}); err != nil {
 		t.Fatal(err)

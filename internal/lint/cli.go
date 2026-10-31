@@ -43,7 +43,7 @@ func Run(argv []string, registry *render.Registry, stdout, stderr io.Writer) int
 		return 2
 	}
 
-	files, err := collectYAML(flags.Args())
+	files, err := collectYAML(flags.Args(), stderr)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "yayamlls: %v\n", err)
 		return 2
@@ -151,16 +151,9 @@ func validateFile(
 				ctx, cancel := context.WithTimeout(context.Background(), renderTimeout)
 				out, rerr := r.Render(ctx, src)
 				cancel()
-				rendered := RenderedDiagnostics(store, resolver, out, rerr, opts)
-				if rerr != nil {
-					// A render failure is a tooling limitation, not a manifest
-					// defect: warn, don't fail CI. Schema violations of rendered
-					// manifests still come back as errors.
-					for i := range rendered {
-						rendered[i].Severity = new(protocol.DiagnosticSeverityWarning)
-					}
-				}
-				diags = append(diags, rendered...)
+				// A render failure is a tooling limitation, not a manifest defect: warn.
+				diags = append(diags, RenderedDiagnostics(
+					store, resolver, parsed, out, rerr, opts, protocol.DiagnosticSeverityWarning)...)
 			}
 		}
 	}
@@ -178,24 +171,46 @@ func validateFile(
 }
 
 // collectYAML expands directory arguments into their *.yaml/*.yml files;
-// explicit file arguments pass through regardless of extension.
-func collectYAML(args []string) ([]string, error) {
+// explicit file arguments pass through regardless of extension. Walks skip
+// .git and node_modules.
+func collectYAML(args []string, stderr io.Writer) ([]string, error) {
 	var out []string
+	seen := map[string]bool{}
+	add := func(path string) {
+		key, err := filepath.Abs(path)
+		if err != nil {
+			key = filepath.Clean(path)
+		}
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, path)
+		}
+	}
 	for _, arg := range args {
 		info, err := os.Stat(arg)
 		if err != nil {
 			return nil, err
 		}
 		if !info.IsDir() {
-			out = append(out, arg)
+			add(arg)
 			continue
 		}
 		err = filepath.WalkDir(arg, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return err
+				if path == arg {
+					return err
+				}
+				_, _ = fmt.Fprintf(stderr, "yayamlls: warning: skipping %v\n", err)
+				return nil
 			}
-			if !d.IsDir() && isYAML(path) {
-				out = append(out, path)
+			if d.IsDir() {
+				if path != arg && (d.Name() == ".git" || d.Name() == "node_modules") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if isYAML(path) {
+				add(path)
 			}
 			return nil
 		})

@@ -17,10 +17,14 @@ const (
 	renderKindDiff     = "diff"
 )
 
+// setPendingShow only records open documents, so a closed URI can't leak an
+// entry.
 func (s *Server) setPendingShow(uri, kind string) {
 	s.showMu.Lock()
-	s.pendingShow[uri] = kind
-	s.showMu.Unlock()
+	defer s.showMu.Unlock()
+	if _, ok := s.docs.Get(uri); ok {
+		s.pendingShow[uri] = kind
+	}
 }
 
 func (s *Server) takePendingShow(uri string) (string, bool) {

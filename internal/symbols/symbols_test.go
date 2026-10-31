@@ -53,3 +53,30 @@ func childNames(syms []protocol.DocumentSymbol) []string {
 	}
 	return out
 }
+
+func within(outer, inner protocol.Range) bool {
+	before := func(a, b protocol.Position) bool {
+		return a.Line < b.Line || (a.Line == b.Line && a.Character <= b.Character)
+	}
+	return before(outer.Start, inner.Start) && before(inner.End, outer.End)
+}
+
+func TestOutline_EntryRangeContainsChildrenAndKey(t *testing.T) {
+	got := Outline(yamlast.Parse([]byte("spec:\n  replicas: 1\n  image: nginx\n\"\": x\n")))
+	top := got[0].Children
+	spec := top[0]
+	if !within(spec.Range, spec.SelectionRange) {
+		t.Errorf("selectionRange %v not inside range %v", spec.SelectionRange, spec.Range)
+	}
+	if len(spec.Children) != 2 {
+		t.Fatalf("children = %v", childNames(spec.Children))
+	}
+	for _, c := range spec.Children {
+		if !within(spec.Range, c.Range) {
+			t.Errorf("child %q range %v outside parent %v", c.Name, c.Range, spec.Range)
+		}
+	}
+	if top[1].Name != `""` {
+		t.Errorf("empty key name = %q, want \"\"", top[1].Name)
+	}
+}

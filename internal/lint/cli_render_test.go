@@ -67,6 +67,27 @@ func TestRun_RenderFailureWarnsButDoesNotFail(t *testing.T) {
 	}
 }
 
+func TestRun_HelmValuesViolationFails(t *testing.T) {
+	root := renderWorkspace(t)
+	doc := filepath.Join(root, "hr.yaml")
+	mustWrite(t, doc, "apiVersion: fake.example.com/v1\nkind: FakeKind\nmetadata:\n  name: x\nspec:\n  values:\n    foo: 1\n")
+
+	reg := render.NewRegistry()
+	reg.Register(fakeRenderer{
+		out: &render.RenderedOutput{Provider: "flate"},
+		err: errors.New("flate: HelmRelease/ns/x: helm template ns/x: values don't meet the specifications " +
+			"of the schema(s) in the following chart(s):\napp-template:\n- at '/foo': false schema\n"),
+	})
+
+	code, stdout, _ := runReg(reg, "--root", root, "--render", doc)
+	if code != 1 {
+		t.Errorf("a helm values violation must fail the run, got exit %d (stdout=%q)", code, stdout)
+	}
+	if want := doc + ":7:5: yayamlls/flate helm values at '/foo': false schema"; !strings.Contains(stdout, want) {
+		t.Errorf("expected %q, got: %q", want, stdout)
+	}
+}
+
 func TestRun_RenderedSchemaViolationFails(t *testing.T) {
 	root := renderWorkspace(t)
 	doc := filepath.Join(root, "hr.yaml")

@@ -22,6 +22,9 @@ type Store struct {
 	compiled   map[string]*jsonschema.Schema
 	failures   map[string]failure
 	inflight   map[string]*inflightCompile
+	// trustGen bumps on every trust-set change so a compile started under the
+	// previous set doesn't repopulate the caches SetTrustRoot just cleared.
+	trustGen uint64
 }
 
 type failure struct {
@@ -60,11 +63,19 @@ func newURLLoader(file jsonschema.URLLoader) jsonschema.URLLoader {
 	}
 }
 
-// SetTrustRoot restricts file:// schema refs to paths inside root, blocking an
-// untrusted modeline/config from reading arbitrary local files. An empty root
-// (e.g. the CLI validate path) leaves file refs unrestricted.
-func (s *Store) SetTrustRoot(root string) {
-	s.fileLoader.setRoot(root)
+// SetTrustRoot restricts file:// refs to root and trusted; with an empty root
+// only trusted paths load. The CLI never calls it, leaving refs unrestricted. A
+// change clears cached compiles and failures.
+func (s *Store) SetTrustRoot(root string, trusted []string) {
+	if !s.fileLoader.setRoot(root, trusted) {
+		return
+	}
+	s.mu.Lock()
+	s.trustGen++
+	clear(s.compiled)
+	clear(s.failures)
+	clear(s.inflight)
+	s.mu.Unlock()
 }
 
 // Cached returns an already-compiled schema without any network I/O, so
@@ -105,6 +116,7 @@ func (s *Store) Get(ref, docPath string) (*jsonschema.Schema, error) {
 	}
 	call := &inflightCompile{done: make(chan struct{})}
 	s.inflight[key] = call
+	gen := s.trustGen
 	s.mu.Unlock()
 
 	// Compile outside the lock: it may fetch the schema over the network,
@@ -117,13 +129,20 @@ func (s *Store) Get(ref, docPath string) (*jsonschema.Schema, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.inflight, key)
+	current := gen == s.trustGen
+	if current {
+		delete(s.inflight, key)
+	}
 	if err != nil {
 		call.err = fmt.Errorf("compile schema %s: %w", key, err)
-		s.failures[key] = failure{err: call.err, at: time.Now()}
+		if current {
+			s.failures[key] = failure{err: call.err, at: time.Now()}
+		}
 	} else {
 		call.sch = sch
-		s.compiled[key] = sch
+		if current {
+			s.compiled[key] = sch
+		}
 	}
 	close(call.done)
 	return call.sch, call.err

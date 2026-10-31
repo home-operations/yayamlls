@@ -65,4 +65,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "server stopped with error: %v\n", err)
 		os.Exit(1)
 	}
+	os.Exit(s.ExitCode())
 }

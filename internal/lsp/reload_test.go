@@ -229,26 +229,35 @@ func TestConcurrent_NotifyAndClose(t *testing.T) {
 	}
 }
 
-// TestPubSeq_MonotonicAcrossCloseReopen locks in the fix for the
-// supersede-counter collision: a pre-close publish goroutine that captured
-// the old seq must NOT match a post-reopen publish with the same numeric
-// value (which would be the case if forgetPublish deleted the counter).
+// Sequences come from a server-wide counter, so a reopen can't reuse a value a
+// pre-close publish goroutine still holds.
 func TestPubSeq_MonotonicAcrossCloseReopen(t *testing.T) {
+	rec := &recorder{}
 	s := New("test", render.NewRegistry())
+	s.captureNotify(rec.ctx())
 	uri := "file:///tmp/pubseq.yaml"
 
+	d := s.docs.Open(uri, testLangID, 1, "a: 1\n")
+	s.schedulePublish(d)
 	s.pubMu.Lock()
-	s.pubSeq[uri] = 5
 	preCloseSeq := s.pubSeq[uri]
 	s.pubMu.Unlock()
 
+	s.docs.Close(uri)
 	s.forgetPublish(uri) // simulates didClose
-
 	s.pubMu.Lock()
-	postCloseSeq := s.pubSeq[uri]
+	_, kept := s.pubSeq[uri]
 	s.pubMu.Unlock()
+	if kept {
+		t.Fatal("forgetPublish must delete the entry")
+	}
 
-	if postCloseSeq <= preCloseSeq {
-		t.Fatalf("forgetPublish must advance the counter: pre=%d post=%d (close+reopen would otherwise pass the seq-equality guard and publish stale diagnostics)", preCloseSeq, postCloseSeq)
+	d = s.docs.Open(uri, testLangID, 1, "a: 1\n")
+	s.schedulePublish(d)
+	s.pubMu.Lock()
+	postReopenSeq := s.pubSeq[uri]
+	s.pubMu.Unlock()
+	if postReopenSeq <= preCloseSeq {
+		t.Fatalf("reopen reused a sequence: pre=%d post=%d", preCloseSeq, postReopenSeq)
 	}
 }

@@ -17,6 +17,13 @@ func TestCanTrail(t *testing.T) {
 		{`key: "a # b"`, true},
 		{`key: 'a # b'`, true},
 		{`name: "value with # hash"`, true},
+		{`msg: "say \" # x"`, true},
+		// An apostrophe inside a plain scalar is not a quote opener.
+		{`msg: it's # note`, false},
+		{`msg: it's fine`, true},
+		{`- 'a # b'`, true},
+		{`k: ['a # b', c]`, true},
+		{`k: ['a', c] # note`, false},
 	}
 	for _, c := range cases {
 		if got := canTrail(c.line); got != c.want {

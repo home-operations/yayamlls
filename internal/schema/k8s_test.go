@@ -647,3 +647,28 @@ func TestRenderK8sURL_LegacySegVarsMatchComposition(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderK8sURL_RejectsNonIdentifiers(t *testing.T) {
+	tests := []struct {
+		name, group, version, kind string
+	}{
+		{"group traversal", "x/../../evil", "v1", "Pod"},
+		{"group dotdot", "..", "v1", "Pod"},
+		{"group slash", "a/b", "v1", "Pod"},
+		{"version query", "apps", "v1?x", "Pod"},
+		{"kind query and fragment", "apps", "v1", "a?b#"},
+		{"kind slash", "apps", "v1", "a/b"},
+		{"kind space", "apps", "v1", "a b"},
+		{"version underscore group", "a_b", "v1", "Pod"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := buildK8sURL(t, "", tt.group, tt.version, tt.kind); got != "" {
+				t.Errorf("got %q, want empty", got)
+			}
+		})
+	}
+	if got := buildK8sURL(t, "", "helm.toolkit.fluxcd.io", "v2beta1", "HelmRelease"); got == "" {
+		t.Error("valid GVK must still render")
+	}
+}

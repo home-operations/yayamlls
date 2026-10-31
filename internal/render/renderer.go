@@ -19,7 +19,8 @@ type manifestHead struct {
 	APIVersion string `yaml:"apiVersion"`
 	Kind       string `yaml:"kind"`
 	Metadata   struct {
-		Name string `yaml:"name"`
+		Name      string `yaml:"name"`
+		Namespace string `yaml:"namespace"`
 	} `yaml:"metadata"`
 }
 
@@ -256,13 +257,14 @@ func AnalyzeDocument(uri, path string, parsed *yamlast.Parsed) *SourceDocument {
 		apiGroup = gvk.Group + "/" + gvk.Version
 	}
 	return &SourceDocument{
-		URI:      uri,
-		Path:     path,
-		Text:     parsed.Text,
-		AST:      parsed.File,
-		Kind:     head.Kind,
-		APIGroup: apiGroup,
-		Name:     head.Metadata.Name,
+		URI:       uri,
+		Path:      path,
+		Text:      parsed.Text,
+		AST:       parsed.File,
+		Kind:      head.Kind,
+		APIGroup:  apiGroup,
+		Name:      head.Metadata.Name,
+		Namespace: head.Metadata.Namespace,
 	}
 }
 

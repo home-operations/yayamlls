@@ -55,7 +55,7 @@ func expandRef(ref, root string) string {
 	if ref == "" || filepath.IsAbs(ref) {
 		return ref
 	}
-	for _, prefix := range []string{"http://", "https://", "file://"} {
+	for _, prefix := range []string{"http://", "https://", "file://", "embedded://"} {
 		if strings.HasPrefix(ref, prefix) {
 			return ref
 		}
@@ -125,10 +125,12 @@ func Merge(base, override Settings) Settings {
 		out.Kubernetes = &merged
 	}
 	if override.Renderers != nil {
-		if out.Renderers == nil {
-			out.Renderers = make(map[string]json.RawMessage)
+		renderers := maps.Clone(out.Renderers)
+		if renderers == nil {
+			renderers = make(map[string]json.RawMessage)
 		}
-		maps.Copy(out.Renderers, override.Renderers)
+		maps.Copy(renderers, override.Renderers)
+		out.Renderers = renderers
 	}
 	if override.FluxSubstitutions != nil {
 		out.FluxSubstitutions = override.FluxSubstitutions

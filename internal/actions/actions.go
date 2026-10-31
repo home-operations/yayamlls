@@ -75,33 +75,8 @@ func suppressAction(uri, text string, d protocol.Diagnostic) (protocol.CodeActio
 
 // canTrail reports whether a trailing "# yayamlls-disable-line" can be appended
 // to the line as a real YAML comment: it must hold code and no existing comment.
-// A "#" opens a comment only when unquoted and at line start or after
-// whitespace; a "#" inside a quoted scalar (e.g. key: "a # b") is just data.
 func canTrail(line string) bool {
-	code := false
-	var quote byte // 0 = none, '\'' or '"' = inside that quote
-	for i := 0; i < len(line); i++ {
-		c := line[i]
-		switch {
-		case quote != 0:
-			if c == quote {
-				quote = 0
-			}
-			code = true
-		case c == '\'' || c == '"':
-			quote = c
-			code = true
-		case c == '#':
-			if i == 0 || line[i-1] == ' ' || line[i-1] == '\t' {
-				return false
-			}
-			code = true
-		case c == ' ' || c == '\t':
-		default:
-			code = true
-		}
-	}
-	return code
+	return strings.TrimSpace(line) != "" && diagnostics.CommentStart(line) < 0
 }
 
 // leadingWS returns the leading whitespace of a line.
@@ -166,16 +141,4 @@ func enumActions(
 	return out
 }
 
-func renderEnumValue(v any) string {
-	switch v := v.(type) {
-	case string:
-		return v
-	case bool, int, int64, float64, json.Number:
-		return fmt.Sprintf("%v", v)
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Sprintf("%v", v)
-	}
-	return string(b)
-}
+func renderEnumValue(v any) string { return yamlast.FormatValue(v) }

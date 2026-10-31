@@ -49,6 +49,9 @@ func (c *callRecorder) wait(t *testing.T) protocol.ShowDocumentParams {
 }
 
 func seedRender(s *Server, uri, raw string) {
+	if _, ok := s.docs.Get(uri); !ok {
+		s.docs.Open(uri, testLangID, 1, "a: 1\n")
+	}
 	s.Notify(uri, &render.RenderedOutput{Provider: "flate", Raw: []byte(raw)}, nil)
 }
 
@@ -96,6 +99,7 @@ func TestShowRendered_DefersUntilRenderLands(t *testing.T) {
 	s.captureNotify(ctx)
 
 	uri := "file:///tmp/hr-deferred.yaml"
+	s.docs.Open(uri, testLangID, 1, "a: 1\n")
 	// Render not ready: the command should defer, showing nothing yet.
 	if _, err := s.executeCommand(ctx, &protocol.ExecuteCommandParams{
 		Command:   CommandShowRendered,
