@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.4](https://github.com/home-operations/yayamlls/compare/0.3.3...0.3.4) (2026-11-07)
+
+
+### Continuous Integration
+
+* **govulncheck:** run the scan on a schedule ([a2aba34](https://github.com/home-operations/yayamlls/commit/a2aba3425e558959444c4edfae5f86b4926ed4db))
+* replace the shared workflow-lint action with zizmor-action ([2270d59](https://github.com/home-operations/yayamlls/commit/2270d59f102462a655ca45b514957d8fd1cfee89))
+
+
+### Miscellaneous Chores
+
+* **github-action:** update action jdx/mise-action (v5.2.4 → v5.2.5) ([#262](https://github.com/home-operations/yayamlls/issues/262)) ([3d05ab3](https://github.com/home-operations/yayamlls/commit/3d05ab331a324da4cfc70388ae3a0ab24a685986))
+* **github-action:** update github-actions ([#264](https://github.com/home-operations/yayamlls/issues/264)) ([5625c66](https://github.com/home-operations/yayamlls/commit/5625c66ce88b346a8249b562da1fbedf080d55aa))
+* **mise:** update tool zizmor (1.31.1 → 1.32.0) ([#265](https://github.com/home-operations/yayamlls/issues/265)) ([f8bad24](https://github.com/home-operations/yayamlls/commit/f8bad24516a25d8879434d736c1f2f7ea34d03f2))
+* **npm:** update dependency @types/vscode (1.144.0 → 1.145.0) ([#266](https://github.com/home-operations/yayamlls/issues/266)) ([7e79ecb](https://github.com/home-operations/yayamlls/commit/7e79ecbd4a5cd8e1a5d6325fc88bd6af9966d43b))
+* **npm:** update dependency vscode (1.144.0 → 1.145.0) ([#263](https://github.com/home-operations/yayamlls/issues/263)) ([eed2551](https://github.com/home-operations/yayamlls/commit/eed2551b1079faba5be8d54bb79cf58636e62493))
+* **npm:** update dependency vscode (1.145.0 → 1.145.1) ([#267](https://github.com/home-operations/yayamlls/issues/267)) ([9aa117e](https://github.com/home-operations/yayamlls/commit/9aa117ea498c5758e9131e8766bee674ac08ca0d))
+* **npm:** update dependency vscode (1.145.1 → 1.145.2) ([#268](https://github.com/home-operations/yayamlls/issues/268)) ([421cf2e](https://github.com/home-operations/yayamlls/commit/421cf2eb5f968595044c0de45fb42b5e2462bf72))
+
 ## [0.3.3](https://github.com/home-operations/yayamlls/compare/0.3.2...0.3.3) (2026-10-31)
 
 
