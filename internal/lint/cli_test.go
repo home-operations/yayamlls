@@ -161,6 +161,41 @@ func TestRun_MultiDocDedupsLoadFailureWarning(t *testing.T) {
 	}
 }
 
+// The schema is bound only by a .yayamlls.yaml glob, so the /age error
+// surfaces only if a relative --root still finds the workspace config.
+func TestRun_RelativeRootLoadsWorkspaceConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		cwd  string // relative to the parent of the workspace
+		root string
+		file string
+	}{
+		{name: "dot", cwd: "ws", root: ".", file: "bad.yaml"},
+		{name: "subdirectory", cwd: ".", root: "ws", file: filepath.Join("ws", "bad.yaml")},
+		{name: "parent-relative", cwd: "ws", root: filepath.Join("..", "ws"), file: "bad.yaml"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parent := t.TempDir()
+			ws := filepath.Join(parent, "ws")
+			if err := os.Mkdir(ws, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			mustWrite(t, filepath.Join(ws, "person.json"), personSchema)
+			mustWrite(t, filepath.Join(ws, ".yayamlls.yaml"),
+				"catalog: false\nschemas:\n  ./person.json:\n    - \"*.yaml\"\n")
+			mustWrite(t, filepath.Join(ws, "bad.yaml"), "name: Alice\nage: thirty\n")
+			t.Chdir(filepath.Join(parent, tt.cwd))
+
+			code, stdout, stderr := run(t, tt.root, tt.file)
+			if code != 1 || !strings.Contains(stdout, "/age") {
+				t.Errorf("--root %q: code=%d stdout=%q stderr=%q, want exit 1 with an /age error",
+					tt.root, code, stdout, stderr)
+			}
+		})
+	}
+}
+
 func TestRun_NoArgsExitsTwo(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := lint.Run(nil, nil, &out, &errb); code != 2 {

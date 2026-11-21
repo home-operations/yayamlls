@@ -56,6 +56,12 @@ func Run(argv []string, registry *render.Registry, stdout, stderr io.Writer) int
 	if root == "" {
 		root = findRoot(files[0])
 	}
+	// uri.FromPath anchors a relative path at "/", so "." would load
+	// /.yayamlls.yaml instead of the one in the working directory.
+	if root, err = filepath.Abs(root); err != nil {
+		_, _ = fmt.Fprintf(stderr, "yayamlls: %v\n", err)
+		return 2
+	}
 	ws, err := config.LoadFromWorkspace(uri.FromPath(root))
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "yayamlls: %v\n", err)
