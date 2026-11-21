@@ -6,10 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/home-operations/yayamlls/internal/config"
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 )
 
 // hostnamePatternSchema is a minimal schema with the Gateway API hostname
@@ -421,5 +423,195 @@ func TestValidateDoc_CustomTag_KindHintMatchesLeadingTag(t *testing.T) {
 	diags := diagnostics.ValidateDoc(doc, sch, body, diagnostics.Options{CustomTags: []string{"!Ref scalar"}})
 	if len(diags) != 0 {
 		t.Errorf("expected kind-hinted tag to match, got: %+v", diags)
+	}
+}
+
+// fluxKustomizationSchema mirrors the parts of the Flux Kustomization schema
+// that a child Kustomization patched by its parent trips over.
+const fluxKustomizationSchema = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"required": ["apiVersion", "kind", "spec"],
+	"properties": {
+		"apiVersion": {"type": "string"},
+		"kind": {"type": "string"},
+		"spec": {
+			"type": "object",
+			"required": ["interval", "prune", "sourceRef"],
+			"properties": {
+				"interval": {"type": "string"},
+				"prune": {"type": "boolean"},
+				"sourceRef": {
+					"type": "object",
+					"required": ["kind", "name"],
+					"properties": {"kind": {"type": "string"}, "name": {"type": "string"}}
+				}
+			}
+		}
+	}
+}`
+
+func TestValidateDoc_IgnoreRequired(t *testing.T) {
+	const (
+		fluxAPI   = "apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\n"
+		fluxGroup = "kustomize.toolkit.fluxcd.io"
+	)
+	fluxRule := func(paths ...string) []config.IgnoreRequiredRule {
+		return []config.IgnoreRequiredRule{{
+			Match: config.KindMatch{Kind: "Kustomization", Group: fluxGroup},
+			Paths: paths,
+		}}
+	}
+	tests := []struct {
+		name  string
+		body  string
+		rules []config.IgnoreRequiredRule
+		want  []string // substrings, one per expected diagnostic, in order
+	}{
+		{
+			name: "no rules reports every missing property",
+			body: fluxAPI + "spec:\n  interval: 1h\n",
+			want: []string{"missing properties 'prune', 'sourceRef' (at /spec)"},
+		},
+		{
+			name:  "all missing properties exempt",
+			body:  fluxAPI + "spec:\n  interval: 1h\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef"),
+		},
+		{
+			name:  "partial exemption reports the rest",
+			body:  fluxAPI + "spec:\n  interval: 1h\n",
+			rules: fluxRule("/spec/prune"),
+			want:  []string{"missing property 'sourceRef' (at /spec)"},
+		},
+		{
+			name:  "non-exempt required property still reports",
+			body:  fluxAPI + "spec: {}\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef"),
+			want:  []string{"missing property 'interval' (at /spec)"},
+		},
+		{
+			name:  "any version of the group matches",
+			body:  "apiVersion: kustomize.toolkit.fluxcd.io/v1beta2\nkind: Kustomization\nspec:\n  interval: 1h\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef"),
+		},
+		{
+			name: "kind mismatch",
+			body: fluxAPI + "spec:\n  interval: 1h\n",
+			rules: []config.IgnoreRequiredRule{{
+				Match: config.KindMatch{Kind: "HelmRelease", Group: fluxGroup},
+				Paths: []string{"/spec/prune", "/spec/sourceRef"},
+			}},
+			want: []string{"missing properties 'prune', 'sourceRef'"},
+		},
+		{
+			name:  "group sharing a prefix does not match",
+			body:  "apiVersion: kustomize.toolkit.fluxcd.iox/v1\nkind: Kustomization\nspec:\n  interval: 1h\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef"),
+			want:  []string{"missing properties 'prune', 'sourceRef'"},
+		},
+		{
+			name: "rule group that is a prefix does not match",
+			body: fluxAPI + "spec:\n  interval: 1h\n",
+			rules: []config.IgnoreRequiredRule{{
+				Match: config.KindMatch{Kind: "Kustomization", Group: "kustomize.toolkit"},
+				Paths: []string{"/spec/prune", "/spec/sourceRef"},
+			}},
+			want: []string{"missing properties 'prune', 'sourceRef'"},
+		},
+		{
+			name: "omitted group matches only the core group",
+			body: fluxAPI + "spec:\n  interval: 1h\n",
+			rules: []config.IgnoreRequiredRule{{
+				Match: config.KindMatch{Kind: "Kustomization"},
+				Paths: []string{"/spec/prune", "/spec/sourceRef"},
+			}},
+			want: []string{"missing properties 'prune', 'sourceRef'"},
+		},
+		{
+			name: "omitted group matches a core-group document",
+			body: "apiVersion: v1\nkind: Kustomization\nspec:\n  interval: 1h\n",
+			rules: []config.IgnoreRequiredRule{{
+				Match: config.KindMatch{Kind: "Kustomization"},
+				Paths: []string{"/spec/prune", "/spec/sourceRef"},
+			}},
+		},
+		{
+			name:  "document without apiVersion is never matched",
+			body:  "kind: Kustomization\nspec:\n  interval: 1h\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef", "/apiVersion"),
+			want:  []string{"missing property 'apiVersion'", "missing properties 'prune', 'sourceRef'"},
+		},
+		{
+			name:  "path at another level does not exempt",
+			body:  fluxAPI + "spec:\n  interval: 1h\n",
+			rules: fluxRule("/prune", "/spec/sourceRef/prune"),
+			want:  []string{"missing properties 'prune', 'sourceRef'"},
+		},
+		{
+			name:  "type error on an exempt property still reports",
+			body:  fluxAPI + "spec:\n  interval: 1h\n  prune: \"yes\"\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef"),
+			want:  []string{"want boolean (at /spec/prune)"},
+		},
+		{
+			name:  "required inside an exempt property still reports",
+			body:  fluxAPI + "spec:\n  interval: 1h\n  prune: true\n  sourceRef:\n    kind: GitRepository\n",
+			rules: fluxRule("/spec/prune", "/spec/sourceRef"),
+			want:  []string{"missing property 'name' (at /spec/sourceRef)"},
+		},
+	}
+	sch := compileInlineSchema(t, fluxKustomizationSchema)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := yamlast.Parse([]byte(tt.body)).Docs()[0]
+			diags := diagnostics.ValidateDoc(doc, sch, tt.body, diagnostics.Options{IgnoreRequired: tt.rules})
+			if len(diags) != len(tt.want) {
+				t.Fatalf("got %d diagnostics, want %d: %+v", len(diags), len(tt.want), diags)
+			}
+			for i, want := range tt.want {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want it to contain %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLeafMessage(t *testing.T) {
+	required := func(loc []string, missing ...string) *jsonschema.ValidationError {
+		return &jsonschema.ValidationError{InstanceLocation: loc, ErrorKind: &kind.Required{Missing: missing}}
+	}
+	tests := []struct {
+		name   string
+		err    *jsonschema.ValidationError
+		exempt map[string]bool
+		want   string
+		wantOK bool
+	}{
+		{name: "nil exempt passes through", err: required([]string{"spec"}, "a", "b"),
+			want: "missing properties 'a', 'b'", wantOK: true},
+		{name: "partial", err: required([]string{"spec"}, "a", "b"), exempt: map[string]bool{"/spec/a": true},
+			want: "missing property 'b'", wantOK: true},
+		{name: "all exempt", err: required([]string{"spec"}, "a", "b"),
+			exempt: map[string]bool{"/spec/a": true, "/spec/b": true}},
+		{name: "document root", err: required(nil, "spec"), exempt: map[string]bool{"/spec": true}},
+		{name: "segments are pointer-escaped", err: required([]string{"metadata", "labels"}, "app.kubernetes.io/name"),
+			exempt: map[string]bool{"/metadata/labels/app.kubernetes.io~1name": true}},
+		{name: "unescaped path does not match", err: required([]string{"metadata", "labels"}, "app.kubernetes.io/name"),
+			exempt: map[string]bool{"/metadata/labels/app.kubernetes.io/name": true},
+			want:   "missing property 'app.kubernetes.io/name'", wantOK: true},
+		{name: "other keywords are untouched",
+			err:    &jsonschema.ValidationError{InstanceLocation: []string{"spec", "prune"}, ErrorKind: &kind.Type{Got: "string", Want: []string{"boolean"}}},
+			exempt: map[string]bool{"/spec/prune": true},
+			want:   "got string, want boolean", wantOK: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := diagnostics.LeafMessage(tt.err, tt.exempt)
+			if got != tt.want || ok != tt.wantOK {
+				t.Errorf("LeafMessage = (%q, %v), want (%q, %v)", got, ok, tt.want, tt.wantOK)
+			}
+		})
 	}
 }

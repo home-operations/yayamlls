@@ -66,7 +66,11 @@ func Run(argv []string, registry *render.Registry, stdout, stderr io.Writer) int
 	resolver.SetSettings(ws)
 	resolver.WaitForCatalog()
 	store := schema.NewStore()
-	opts := diagnostics.Options{FluxSubstitutions: ws.FluxSubstitutionsEnabled(), CustomTags: ws.CustomTagNames()}
+	opts := diagnostics.Options{
+		FluxSubstitutions: ws.FluxSubstitutionsEnabled(),
+		CustomTags:        ws.CustomTagNames(),
+		IgnoreRequired:    ws.IgnoreRequired,
+	}
 
 	// Rendering is opt-in: it shells out to git/helm, so plain validation
 	// stays fast and offline. Wire the registry as the server does, dropping

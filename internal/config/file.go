@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -143,6 +144,10 @@ func Merge(base, override Settings) Settings {
 	}
 	if override.CustomTags != nil {
 		out.CustomTags = unionStrings(out.CustomTags, override.CustomTags)
+	}
+	// Rules from every layer apply, so an override adds exemptions.
+	if override.IgnoreRequired != nil {
+		out.IgnoreRequired = slices.Concat(out.IgnoreRequired, override.IgnoreRequired)
 	}
 	return out
 }

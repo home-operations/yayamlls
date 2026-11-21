@@ -314,6 +314,16 @@ catalogUrl: ""
 # customTags:
 #   - "!Ref"
 #   - "!vault"
+
+# Optional. Properties that matching documents may omit without a `required`
+# error, because another layer supplies them (e.g. a parent Flux
+# Kustomization's spec.patches). match selects by kind and group (any version;
+# omit group for the core group); paths are JSON Pointers to the exempt
+# properties. Everything else, including type errors on those properties,
+# still reports.
+# ignoreRequired:
+#   - match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }
+#     paths: ["/spec/prune", "/spec/sourceRef"]
 ```
 
 By default `flate` builds from the workspace root, following Flux's `spec.path`
