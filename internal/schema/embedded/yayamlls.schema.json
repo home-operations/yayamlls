@@ -87,6 +87,40 @@
       "items": { "type": "string" },
       "description": "YAML tags whose values an external tool resolves (e.g. '!Ref', '!vault'). Nodes carrying one skip schema validation. An optional kind hint after the tag ('!Sub sequence') is ignored for matching."
     },
+    "ignoreRequired": {
+      "type": "array",
+      "description": "Exempt properties from 'required' errors on matching documents, for values another layer supplies (e.g. a parent Flux Kustomization's spec.patches). Only the listed properties are exempt; every other error on the document still reports.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["match", "paths"],
+        "properties": {
+          "match": {
+            "type": "object",
+            "description": "Which documents this rule applies to.",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Kubernetes kind to match, e.g. 'Kustomization'."
+              },
+              "group": {
+                "type": "string",
+                "description": "API group to match, e.g. 'kustomize.toolkit.fluxcd.io'; any version of it matches. Omit for the core group."
+              }
+            }
+          },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "pattern": "^/" },
+            "description": "JSON Pointers to the properties that may be omitted, e.g. '/spec/prune'."
+          }
+        }
+      }
+    },
     "renderDebounceMs": {
       "type": "integer",
       "minimum": 1,

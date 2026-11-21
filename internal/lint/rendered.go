@@ -85,8 +85,13 @@ func flattenRendered(
 	out *render.RenderedOutput, m render.RenderedManifest, verr *jsonschema.ValidationError, opts diagnostics.Options,
 ) []protocol.Diagnostic {
 	src := renderSource(out)
+	exempt := opts.ExemptRequired(m.GVK.Group, m.GVK.Kind)
 	return diagnostics.WalkLeaves(verr, func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool) {
 		if diagnostics.FluxSubstituted(m.AST, e, opts) {
+			return protocol.Diagnostic{}, true
+		}
+		msg, ok := diagnostics.LeafMessage(e, exempt)
+		if !ok {
 			return protocol.Diagnostic{}, true
 		}
 		loc := diagnostics.Pointer(e.InstanceLocation)
@@ -96,7 +101,7 @@ func flattenRendered(
 		return protocol.Diagnostic{
 			Severity: new(protocol.DiagnosticSeverityError),
 			Source:   &src,
-			Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, diagnostics.Message(e)),
+			Message:  fmt.Sprintf("[rendered %s/%s @ %s] %s", m.GVK.Kind, m.Name, loc, msg),
 		}, false
 	})
 }

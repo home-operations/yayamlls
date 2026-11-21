@@ -450,7 +450,11 @@ func (s *Server) cancelRequest(ctx *glsp.Context, params *protocol.CancelParams)
 func (s *Server) diagnosticOptions() diagnostics.Options {
 	s.settingsMu.Lock()
 	defer s.settingsMu.Unlock()
-	return diagnostics.Options{FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(), CustomTags: s.settings.CustomTagNames()}
+	return diagnostics.Options{
+		FluxSubstitutions: s.settings.FluxSubstitutionsEnabled(),
+		CustomTags:        s.settings.CustomTagNames(),
+		IgnoreRequired:    s.settings.IgnoreRequired,
+	}
 }
 
 func (s *Server) Notify(uri string, out *render.RenderedOutput, err error) {

@@ -161,6 +161,60 @@ func TestRun_MultiDocDedupsLoadFailureWarning(t *testing.T) {
 	}
 }
 
+const childKustomizationSchema = `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "object",
+      "required": ["interval", "prune", "sourceRef"],
+      "properties": { "prune": { "type": "boolean" } }
+    }
+  }
+}`
+
+// The workspace config exempts prune and sourceRef; the CLI must apply it
+// without hiding anything else wrong with the document.
+func TestRun_IgnoreRequiredFromWorkspaceConfig(t *testing.T) {
+	const header = "# yaml-language-server: $schema=./ks.json\n" +
+		"apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\n"
+	tests := []struct {
+		name     string
+		body     string
+		wantCode int
+		want     string
+	}{
+		{name: "exempt properties omitted", body: header + "spec:\n  interval: 1h\n"},
+		{name: "non-exempt property still required", body: header + "spec: {}\n",
+			wantCode: 1, want: "missing property 'interval' (at /spec)"},
+		{name: "exempt property with the wrong type", body: header + "spec:\n  interval: 1h\n  prune: \"yes\"\n",
+			wantCode: 1, want: "got string, want boolean (at /spec/prune)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			mustWrite(t, filepath.Join(root, "ks.json"), childKustomizationSchema)
+			mustWrite(t, filepath.Join(root, ".yayamlls.yaml"), "catalog: false\n"+
+				"ignoreRequired:\n"+
+				"  - match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }\n"+
+				"    paths: [/spec/prune, /spec/sourceRef]\n")
+			doc := filepath.Join(root, "ks.yaml")
+			mustWrite(t, doc, tt.body)
+
+			code, stdout, stderr := run(t, root, doc)
+			if code != tt.wantCode {
+				t.Errorf("exit code = %d, want %d (stdout: %q, stderr: %q)", code, tt.wantCode, stdout, stderr)
+			}
+			if tt.want == "" && stdout != "" {
+				t.Errorf("expected no output, got %q", stdout)
+			}
+			if tt.want != "" && (strings.Count(stdout, "\n") != 1 || !strings.Contains(stdout, tt.want)) {
+				t.Errorf("expected exactly one diagnostic containing %q, got %q", tt.want, stdout)
+			}
+		})
+	}
+}
+
 func TestRun_NoArgsExitsTwo(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := lint.Run(nil, nil, &out, &errb); code != 2 {

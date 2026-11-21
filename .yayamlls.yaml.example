@@ -39,3 +39,11 @@ catalog: true
 # customTags:
 #   - "!Ref"
 #   - "!vault"
+
+# Properties another layer supplies (e.g. a parent Flux Kustomization's
+# spec.patches) and that matching documents may omit without a `required`
+# error. Paths are JSON Pointers; every other error still reports.
+#
+# ignoreRequired:
+#   - match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }
+#     paths: ["/spec/prune", "/spec/sourceRef"]
