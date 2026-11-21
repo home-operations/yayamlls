@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -250,5 +251,101 @@ func TestExpandRef_LeavesURLsAlone(t *testing.T) {
 	}
 	if got := expandRef("s/a.json", "/root"); got != filepath.Join("/root", "s/a.json") {
 		t.Errorf("relative ref = %q", got)
+	}
+}
+
+func TestLoadFile_IgnoreRequired(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".yayamlls.yaml")
+	body := `ignoreRequired:
+  - match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }
+    paths: ["/spec/prune", "/spec/sourceRef"]
+  - match:
+      kind: ConfigMap
+    paths:
+      - /data
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	want := []IgnoreRequiredRule{
+		{
+			Match: KindMatch{Kind: "Kustomization", Group: "kustomize.toolkit.fluxcd.io"},
+			Paths: []string{"/spec/prune", "/spec/sourceRef"},
+		},
+		{Match: KindMatch{Kind: "ConfigMap"}, Paths: []string{"/data"}},
+	}
+	if !reflect.DeepEqual(got.IgnoreRequired, want) {
+		t.Errorf("ignoreRequired = %+v, want %+v", got.IgnoreRequired, want)
+	}
+}
+
+func TestMerge_IgnoreRequired(t *testing.T) {
+	ks := IgnoreRequiredRule{Match: KindMatch{Kind: "Kustomization"}, Paths: []string{"/spec/prune"}}
+	hr := IgnoreRequiredRule{Match: KindMatch{Kind: "HelmRelease"}, Paths: []string{"/spec/chart"}}
+	tests := []struct {
+		name           string
+		base, override []IgnoreRequiredRule
+		want           []IgnoreRequiredRule
+	}{
+		{name: "override adds to base", base: []IgnoreRequiredRule{ks}, override: []IgnoreRequiredRule{hr},
+			want: []IgnoreRequiredRule{ks, hr}},
+		{name: "absent override keeps base", base: []IgnoreRequiredRule{ks}, want: []IgnoreRequiredRule{ks}},
+		{name: "override alone", override: []IgnoreRequiredRule{hr}, want: []IgnoreRequiredRule{hr}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Merge(Settings{IgnoreRequired: tt.base}, Settings{IgnoreRequired: tt.override})
+			if !reflect.DeepEqual(got.IgnoreRequired, tt.want) {
+				t.Errorf("IgnoreRequired = %+v, want %+v", got.IgnoreRequired, tt.want)
+			}
+		})
+	}
+}
+
+func TestMerge_DoesNotMutateBaseIgnoreRequired(t *testing.T) {
+	ks := IgnoreRequiredRule{Match: KindMatch{Kind: "Kustomization"}, Paths: []string{"/spec/prune"}}
+	hr := IgnoreRequiredRule{Match: KindMatch{Kind: "HelmRelease"}, Paths: []string{"/spec/chart"}}
+	base := make([]IgnoreRequiredRule, 1, 4) // spare capacity an append would write into
+	base[0] = ks
+	_ = Merge(Settings{IgnoreRequired: base}, Settings{IgnoreRequired: []IgnoreRequiredRule{hr}})
+	if got := base[:cap(base)][1]; !reflect.DeepEqual(got, IgnoreRequiredRule{}) {
+		t.Errorf("Merge wrote into base's backing array: %+v", got)
+	}
+}
+
+func TestKindMatch_Matches(t *testing.T) {
+	const flux = "kustomize.toolkit.fluxcd.io"
+	tests := []struct {
+		name        string
+		match       KindMatch
+		group, kind string
+		want        bool
+	}{
+		{name: "kind and group", match: KindMatch{Kind: "Kustomization", Group: flux},
+			group: flux, kind: "Kustomization", want: true},
+		{name: "kind mismatch", match: KindMatch{Kind: "Kustomization", Group: flux},
+			group: flux, kind: "HelmRelease"},
+		{name: "kind is case-sensitive", match: KindMatch{Kind: "kustomization", Group: flux},
+			group: flux, kind: "Kustomization"},
+		{name: "group prefix is not a match", match: KindMatch{Kind: "Kustomization", Group: "kustomize.toolkit"},
+			group: flux, kind: "Kustomization"},
+		{name: "longer group is not a match", match: KindMatch{Kind: "Kustomization", Group: flux},
+			group: flux + "x", kind: "Kustomization"},
+		{name: "empty group is the core group", match: KindMatch{Kind: "ConfigMap"},
+			group: "", kind: "ConfigMap", want: true},
+		{name: "empty group does not match a named group", match: KindMatch{Kind: "Kustomization"},
+			group: flux, kind: "Kustomization"},
+		{name: "empty kind matches nothing", match: KindMatch{Group: flux}, group: flux, kind: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.match.Matches(tt.group, tt.kind); got != tt.want {
+				t.Errorf("Matches(%q, %q) = %v, want %v", tt.group, tt.kind, got, tt.want)
+			}
+		})
 	}
 }

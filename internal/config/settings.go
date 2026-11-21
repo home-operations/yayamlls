@@ -25,6 +25,31 @@ type Settings struct {
 	// editor config: a .yayamlls.yaml in a cloned repo could otherwise grant
 	// itself read access to arbitrary local files.
 	TrustedSchemaPaths []string `json:"trustedSchemaPaths,omitempty"`
+	// IgnoreRequired exempts properties from `required` errors on matching
+	// documents, for values another layer supplies (e.g. a parent Flux
+	// Kustomization's spec.patches). Other errors on those documents still
+	// report.
+	IgnoreRequired []IgnoreRequiredRule `json:"ignoreRequired,omitempty"`
+}
+
+// IgnoreRequiredRule exempts Paths from `required` on documents that match.
+type IgnoreRequiredRule struct {
+	Match KindMatch `json:"match"`
+	// Paths are JSON Pointers to the exempt properties, e.g. "/spec/prune".
+	Paths []string `json:"paths"`
+}
+
+// KindMatch selects documents by kind and API group. An empty Group is the
+// core group; the apiVersion's version is not compared.
+type KindMatch struct {
+	Kind  string `json:"kind"`
+	Group string `json:"group,omitempty"`
+}
+
+// Matches reports whether a document of the given API group and kind is
+// selected. A match with no Kind selects nothing.
+func (m KindMatch) Matches(group, kind string) bool {
+	return m.Kind != "" && m.Kind == kind && m.Group == group
 }
 
 type KubernetesSettings struct {
