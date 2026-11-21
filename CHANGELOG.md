@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.3.4](https://github.com/home-operations/yayamlls/compare/0.3.3...0.3.4) (2026-11-21)
+
+
+### Bug Fixes
+
+* **validate:** resolve a relative --root before loading workspace config ([#286](https://github.com/home-operations/yayamlls/issues/286)) ([e472c91](https://github.com/home-operations/yayamlls/commit/e472c91ec740856b44de32a7250fa7580187165f))
+
+
+### Continuous Integration
+
+* **govulncheck:** run the scan on a schedule ([a2aba34](https://github.com/home-operations/yayamlls/commit/a2aba3425e558959444c4edfae5f86b4926ed4db))
+* replace the shared workflow-lint action with zizmor-action ([2270d59](https://github.com/home-operations/yayamlls/commit/2270d59f102462a655ca45b514957d8fd1cfee89))
+
+
+### Miscellaneous Chores
+
+* **github-action:** update action docker/github-builder (v1.18.1 → v1.19.0) ([#270](https://github.com/home-operations/yayamlls/issues/270)) ([ba1b89b](https://github.com/home-operations/yayamlls/commit/ba1b89b8f3c995ad874cd15d123700d3c15a4fce))
+* **github-action:** update action jdx/mise-action (v5.2.4 → v5.2.5) ([#262](https://github.com/home-operations/yayamlls/issues/262)) ([3d05ab3](https://github.com/home-operations/yayamlls/commit/3d05ab331a324da4cfc70388ae3a0ab24a685986))
+* **github-action:** update action jdx/mise-action (v5.2.6 → v5.2.7) ([#271](https://github.com/home-operations/yayamlls/issues/271)) ([cd4a87c](https://github.com/home-operations/yayamlls/commit/cd4a87cd36970b09768be87a364be69aca8ce84f))
+* **github-action:** update action jdx/mise-action (v5.2.7 → v5.2.8) ([#277](https://github.com/home-operations/yayamlls/issues/277)) ([7afc0c3](https://github.com/home-operations/yayamlls/commit/7afc0c35e34acc8a6eee502af510b955b7386959))
+* **github-action:** update action jdx/mise-action (v5.2.8 → v5.2.9) ([#281](https://github.com/home-operations/yayamlls/issues/281)) ([26fa48a](https://github.com/home-operations/yayamlls/commit/26fa48ae733f00ded3dd6284fc7fee40fb493b30))
+* **github-action:** update action sigstore/cosign-installer (v4.1.2 → v4.1.3) ([#269](https://github.com/home-operations/yayamlls/issues/269)) ([5b0e8c2](https://github.com/home-operations/yayamlls/commit/5b0e8c21a12b162caa863303ba4fe2a6f8072039))
+* **github-action:** update github-actions ([#264](https://github.com/home-operations/yayamlls/issues/264)) ([5625c66](https://github.com/home-operations/yayamlls/commit/5625c66ce88b346a8249b562da1fbedf080d55aa))
+* **github-action:** update github-actions ([#288](https://github.com/home-operations/yayamlls/issues/288)) ([eb80024](https://github.com/home-operations/yayamlls/commit/eb80024940c7a27f83e63266c03af77f1a0c5e50))
+* **mise:** install oxfmt from GitHub releases ([#278](https://github.com/home-operations/yayamlls/issues/278)) ([9c54a2e](https://github.com/home-operations/yayamlls/commit/9c54a2ebe210a2e91978cf5af45ec0fca7b7c86a))
+* **mise:** update tool github:oxc-project/oxc (0.75.0 → 0.78.0) ([#279](https://github.com/home-operations/yayamlls/issues/279)) ([b25a0a3](https://github.com/home-operations/yayamlls/commit/b25a0a3722a63854a20c4ffa573f461b68030458))
+* **mise:** update tool github:oxc-project/oxc (0.78.0 → 0.79.0) ([#282](https://github.com/home-operations/yayamlls/issues/282)) ([906a40c](https://github.com/home-operations/yayamlls/commit/906a40c55260a9f415ff488d32fe1e251719a6b5))
+* **mise:** update tool go (1.27.3 → 1.27.4) ([#276](https://github.com/home-operations/yayamlls/issues/276)) ([6027a94](https://github.com/home-operations/yayamlls/commit/6027a9497a46c12f5b77a5d6ee0c9e2942fe44a7))
+* **mise:** update tool go:golang.org/x/vuln/cmd/govulncheck (1.9.0 → v1.10.0) ([#280](https://github.com/home-operations/yayamlls/issues/280)) ([b11540f](https://github.com/home-operations/yayamlls/commit/b11540f5e26c25d39e68208dda080ac787d94421))
+* **mise:** update tool zizmor (1.31.1 → 1.32.0) ([#265](https://github.com/home-operations/yayamlls/issues/265)) ([f8bad24](https://github.com/home-operations/yayamlls/commit/f8bad24516a25d8879434d736c1f2f7ea34d03f2))
+* **npm:** update dependency @types/vscode (1.144.0 → 1.145.0) ([#266](https://github.com/home-operations/yayamlls/issues/266)) ([7e79ecb](https://github.com/home-operations/yayamlls/commit/7e79ecbd4a5cd8e1a5d6325fc88bd6af9966d43b))
+* **npm:** update dependency vscode (1.144.0 → 1.145.0) ([#263](https://github.com/home-operations/yayamlls/issues/263)) ([eed2551](https://github.com/home-operations/yayamlls/commit/eed2551b1079faba5be8d54bb79cf58636e62493))
+* **npm:** update dependency vscode (1.145.0 → 1.145.1) ([#267](https://github.com/home-operations/yayamlls/issues/267)) ([9aa117e](https://github.com/home-operations/yayamlls/commit/9aa117ea498c5758e9131e8766bee674ac08ca0d))
+* **npm:** update dependency vscode (1.145.1 → 1.145.2) ([#268](https://github.com/home-operations/yayamlls/issues/268)) ([421cf2e](https://github.com/home-operations/yayamlls/commit/421cf2eb5f968595044c0de45fb42b5e2462bf72))
+* **npm:** update dependency vscode (1.145.2 → 1.145.3) ([#274](https://github.com/home-operations/yayamlls/issues/274)) ([18afaac](https://github.com/home-operations/yayamlls/commit/18afaac8882568667a201ee53c33f7b50679d6f7))
+* **npm:** update dependency vscode (1.145.3 → 1.146.0) ([#275](https://github.com/home-operations/yayamlls/issues/275)) ([9c4e91e](https://github.com/home-operations/yayamlls/commit/9c4e91e0c10a3e0e5f2dfbd62eda67d7b98ae3e1))
+* **npm:** update dependency vscode (1.146.0 → 1.147.0) ([#283](https://github.com/home-operations/yayamlls/issues/283)) ([c8a69ec](https://github.com/home-operations/yayamlls/commit/c8a69ec6e4dc2b34036df7fbc5677a874ebd4d59))
+
 ## [0.3.3](https://github.com/home-operations/yayamlls/compare/0.3.2...0.3.3) (2026-10-31)
 
 
