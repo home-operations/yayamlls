@@ -49,3 +49,24 @@ func TestReloadWorkspaceConfig_MalformedKeepsPriorSettings(t *testing.T) {
 		t.Fatal("expected a warning when reload fails to parse")
 	}
 }
+
+func TestReloadWorkspaceConfig_AppliesIgnoreRequired(t *testing.T) {
+	ws := t.TempDir()
+	body := "ignoreRequired:\n" +
+		"  - match: { kind: Kustomization, group: kustomize.toolkit.fluxcd.io }\n" +
+		"    paths: [/spec/prune]\n"
+	if err := os.WriteFile(filepath.Join(ws, ".yayamlls.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New("test", render.NewRegistry())
+	s.settingsMu.Lock()
+	s.workspaceRoot = "file://" + ws
+	s.settingsMu.Unlock()
+	s.reloadWorkspaceConfig(&glsp.Context{Notify: func(string, any) {}})
+
+	exempt := s.diagnosticOptions().ExemptRequired("kustomize.toolkit.fluxcd.io", "Kustomization")
+	if len(exempt) != 1 || !exempt["/spec/prune"] {
+		t.Fatalf("expected /spec/prune exempt for Flux Kustomizations, got %v", exempt)
+	}
+}

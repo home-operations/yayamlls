@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/goccy/go-yaml/parser"
+	"github.com/home-operations/yayamlls/internal/config"
 	"github.com/home-operations/yayamlls/internal/diagnostics"
 	"github.com/home-operations/yayamlls/internal/render"
 	"github.com/home-operations/yayamlls/internal/schema"
@@ -259,5 +260,71 @@ func TestFlattenRendered_FluxSubstitutionSuppressed(t *testing.T) {
 	// Rendered docs have no source line: kind/name/pointer ride in the message.
 	if !strings.Contains(diags[0].Message, "[rendered Pod/test @ /hostname]") {
 		t.Errorf("message = %q, want the rendered kind/name/pointer prefix", diags[0].Message)
+	}
+}
+
+func TestFlattenRendered_IgnoreRequired(t *testing.T) {
+	const schemaBody = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"spec": {"type": "object", "required": ["interval", "prune", "sourceRef"]}
+		}
+	}`
+	sch, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft2020)
+	if err := c.AddResource("mem://k.json", sch); err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := c.Compile("mem://k.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := parser.ParseBytes([]byte("spec: {}\n"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const fluxGroup = "kustomize.toolkit.fluxcd.io"
+	m := render.RenderedManifest{
+		AST:  f.Docs[0],
+		GVK:  render.GVK{Group: fluxGroup, Version: "v1", Kind: "Kustomization"},
+		Name: "child",
+	}
+	value, err := yamlast.Decode(m.AST)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verr, ok := errors.AsType[*jsonschema.ValidationError](compiled.Validate(value))
+	if !ok {
+		t.Fatal("expected a validation error")
+	}
+
+	rule := func(kind string) diagnostics.Options {
+		return diagnostics.Options{IgnoreRequired: []config.IgnoreRequiredRule{{
+			Match: config.KindMatch{Kind: kind, Group: fluxGroup},
+			Paths: []string{"/spec/prune", "/spec/sourceRef"},
+		}}}
+	}
+	tests := []struct {
+		name string
+		opts diagnostics.Options
+		want string
+	}{
+		{name: "matching rule keeps only the non-exempt property", opts: rule("Kustomization"),
+			want: "[rendered Kustomization/child @ /spec] missing property 'interval'"},
+		{name: "kind mismatch reports everything", opts: rule("HelmRelease"),
+			want: "[rendered Kustomization/child @ /spec] missing properties 'interval', 'prune', 'sourceRef'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diags := flattenRendered(&render.RenderedOutput{Provider: "flate"}, m, verr, tt.opts)
+			if len(diags) != 1 || diags[0].Message != tt.want {
+				t.Errorf("got %+v, want one diagnostic %q", diags, tt.want)
+			}
+		})
 	}
 }

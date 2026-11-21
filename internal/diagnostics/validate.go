@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml/ast"
+	"github.com/home-operations/yayamlls/internal/config"
+	"github.com/home-operations/yayamlls/internal/schema"
 	"github.com/home-operations/yayamlls/internal/yamlast"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/santhosh-tekuri/jsonschema/v6/kind"
@@ -26,6 +28,27 @@ type Options struct {
 	// resolved by an external tool. A node carrying one is not validated,
 	// since its decoded scalar is a placeholder, not the real value.
 	CustomTags []string
+	// IgnoreRequired lists properties that matching documents may omit
+	// without a `required` error.
+	IgnoreRequired []config.IgnoreRequiredRule
+}
+
+// ExemptRequired returns the JSON Pointers of the properties that a document
+// of the given API group and kind may omit, or nil if none.
+func (o Options) ExemptRequired(group, docKind string) map[string]bool {
+	var exempt map[string]bool
+	for _, r := range o.IgnoreRequired {
+		if !r.Match.Matches(group, docKind) {
+			continue
+		}
+		if exempt == nil {
+			exempt = make(map[string]bool, len(r.Paths))
+		}
+		for _, p := range r.Paths {
+			exempt[p] = true
+		}
+	}
+	return exempt
 }
 
 func Validate(parsed *yamlast.Parsed, sch *jsonschema.Schema, opts Options) []protocol.Diagnostic {
@@ -99,6 +122,10 @@ type CauseData struct {
 func flattenValidationError(
 	doc *ast.DocumentNode, verr *jsonschema.ValidationError, src string, opts Options,
 ) []protocol.Diagnostic {
+	var exempt map[string]bool
+	if gvk, ok := schema.DetectGVK(doc.Body); ok {
+		exempt = opts.ExemptRequired(gvk.Group, gvk.Kind)
+	}
 	return WalkLeaves(verr, func(e *jsonschema.ValidationError) (protocol.Diagnostic, bool) {
 		if FluxSubstituted(doc, e, opts) {
 			return protocol.Diagnostic{}, true
@@ -106,10 +133,14 @@ func flattenValidationError(
 		if hasCustomTag(doc, Pointer(e.InstanceLocation), opts.CustomTags) {
 			return protocol.Diagnostic{}, true
 		}
+		msg, ok := LeafMessage(e, exempt)
+		if !ok {
+			return protocol.Diagnostic{}, true
+		}
 		return protocol.Diagnostic{
 			Severity: new(protocol.DiagnosticSeverityError),
 			Source:   new(Source),
-			Message:  fmt.Sprintf("%s (at %s)", Message(e), displayPointer(Pointer(e.InstanceLocation))),
+			Message:  fmt.Sprintf("%s (at %s)", msg, displayPointer(Pointer(e.InstanceLocation))),
 			Range:    leafRange(doc, e, src),
 			Data:     dataFor(e),
 		}, false
@@ -349,6 +380,27 @@ func dataFor(e *jsonschema.ValidationError) any {
 // Message renders a validation error's text.
 func Message(e *jsonschema.ValidationError) string {
 	return e.ErrorKind.LocalizedString(errPrinter)
+}
+
+// LeafMessage renders e's text with the properties in exempt (JSON Pointers,
+// see Options.ExemptRequired) dropped from a `required` error. ok is false
+// when every missing property is exempt, so the error should not report.
+func LeafMessage(e *jsonschema.ValidationError, exempt map[string]bool) (msg string, ok bool) {
+	req, isRequired := e.ErrorKind.(*kind.Required)
+	if !isRequired || len(exempt) == 0 {
+		return Message(e), true
+	}
+	base := Pointer(e.InstanceLocation)
+	missing := make([]string, 0, len(req.Missing))
+	for _, p := range req.Missing {
+		if !exempt[base+"/"+yamlast.EscapePointerSegment(p)] {
+			missing = append(missing, p)
+		}
+	}
+	if len(missing) == 0 {
+		return "", false
+	}
+	return (&kind.Required{Missing: missing}).LocalizedString(errPrinter), true
 }
 
 // Pointer renders a v6 instance location as a JSON Pointer string.
